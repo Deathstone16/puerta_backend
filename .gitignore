@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Virtualenv
+venv/
+.env
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Migrations - keep them tracked, ignore cache only
+**/migrations/*.pyc
