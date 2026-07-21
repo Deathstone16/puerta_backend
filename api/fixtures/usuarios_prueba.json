@@ -1,0 +1,102 @@
+[
+  {
+    "model": "cuentas.usuario",
+    "pk": 1,
+    "fields": {
+      "username": "admin",
+      "password": "pbkdf2_sha256$1200000$FfFqIkdRM8RhxumkPzCLsU$twcaN6gKd7lgtShCnf4O58vBzvSWw/e+ndXkV4Rg1UI=",
+      "first_name": "Admin",
+      "last_name": "Norware",
+      "email": "admin@norware.com",
+      "is_staff": true,
+      "is_superuser": true,
+      "is_active": true,
+      "rol": "superadmin",
+      "telefono": null,
+      "groups": [],
+      "user_permissions": [],
+      "date_joined": "2026-01-01T00:00:00Z",
+      "last_login": null
+    }
+  },
+  {
+    "model": "cuentas.usuario",
+    "pk": 2,
+    "fields": {
+      "username": "carlos_dueno",
+      "password": "pbkdf2_sha256$1200000$dgCQWY5zX8RXGZLhNe1BNi$y9jsZ5ZaTujOHupyB9X8ulvWuMxDgdKW8JHOz1Y10Qo=",
+      "first_name": "Carlos",
+      "last_name": "García",
+      "email": "carlos@norware.com",
+      "is_staff": false,
+      "is_superuser": false,
+      "is_active": true,
+      "rol": "dueno",
+      "telefono": null,
+      "groups": [],
+      "user_permissions": [],
+      "date_joined": "2026-01-01T00:00:00Z",
+      "last_login": null
+    }
+  },
+  {
+    "model": "cuentas.usuario",
+    "pk": 3,
+    "fields": {
+      "username": "juan_rrpp",
+      "password": "pbkdf2_sha256$1200000$NkNNQZsUOBhyfDmLjCMmZY$j6KVD+lht9Idnrd2Qz+Z44nNG29xQDSzswaAvlHadh8=",
+      "first_name": "Juan",
+      "last_name": "Pérez",
+      "email": "juan@norware.com",
+      "is_staff": false,
+      "is_superuser": false,
+      "is_active": true,
+      "rol": "rrpp",
+      "telefono": null,
+      "groups": [],
+      "user_permissions": [],
+      "date_joined": "2026-01-01T00:00:00Z",
+      "last_login": null
+    }
+  },
+  {
+    "model": "cuentas.usuario",
+    "pk": 4,
+    "fields": {
+      "username": "maria_guardia",
+      "password": "pbkdf2_sha256$1200000$8pniANlwaLpWjoe5M1AAwf$hywtXS9vVdskPIB95xx+Vk2pJ1+Ui1iLTbv1WiBCAbI=",
+      "first_name": "María",
+      "last_name": "López",
+      "email": "maria@norware.com",
+      "is_staff": false,
+      "is_superuser": false,
+      "is_active": true,
+      "rol": "guardia",
+      "telefono": null,
+      "groups": [],
+      "user_permissions": [],
+      "date_joined": "2026-01-01T00:00:00Z",
+      "last_login": null
+    }
+  },
+  {
+    "model": "cuentas.usuario",
+    "pk": 5,
+    "fields": {
+      "username": "ana_cajera",
+      "password": "pbkdf2_sha256$1200000$qNXBtv073ZS4OyyU4TZUVs$ByYN9BQ/DiC7OxhFuXo7LWPn3iaxdXC8Zskzw7YNub0=",
+      "first_name": "Ana",
+      "last_name": "Gómez",
+      "email": "ana@norware.com",
+      "is_staff": false,
+      "is_superuser": false,
+      "is_active": true,
+      "rol": "cajera",
+      "telefono": null,
+      "groups": [],
+      "user_permissions": [],
+      "date_joined": "2026-01-01T00:00:00Z",
+      "last_login": null
+    }
+  }
+]
