@@ -76,24 +76,29 @@ DATABASES = {
 # En local sin DATABASE_URL, cae a SQLite automáticamente.
 _database_url = config('DATABASE_URL', default='')
 if _database_url:
-    from urllib.parse import urlparse
-    _parsed = urlparse(_database_url)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': _parsed.path.lstrip('/'),
-            'USER': _parsed.username,
-            'PASSWORD': _parsed.password,
-            'HOST': _parsed.hostname,
-            'PORT': _parsed.port or 5432,
-            'CONN_MAX_AGE': 0,
-            'CONN_HEALTH_CHECKS': True,
-            'DISABLE_SERVER_SIDE_CURSORS': True,
-            'OPTIONS': {
-                'sslmode': 'require',
-            },
+    import re
+    # Parseo manual porque urllib.parse en Python 3.14 falla con hostnames de Supabase
+    _match = re.match(
+        r'postgres(?:ql)?://(?P<user>[^:]+):(?P<password>[^@]+)@(?P<host>[^:/]+):?(?P<port>\d+)?/(?P<name>.+)',
+        _database_url,
+    )
+    if _match:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': _match.group('name'),
+                'USER': _match.group('user'),
+                'PASSWORD': _match.group('password'),
+                'HOST': _match.group('host'),
+                'PORT': _match.group('port') or '5432',
+                'CONN_MAX_AGE': 0,
+                'CONN_HEALTH_CHECKS': True,
+                'DISABLE_SERVER_SIDE_CURSORS': True,
+                'OPTIONS': {
+                    'sslmode': 'require',
+                },
+            }
         }
-    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
