@@ -76,18 +76,24 @@ DATABASES = {
 # En local sin DATABASE_URL, cae a SQLite automáticamente.
 _database_url = config('DATABASE_URL', default='')
 if _database_url:
-    import dj_database_url
+    from urllib.parse import urlparse
+    _parsed = urlparse(_database_url)
     DATABASES = {
-        'default': dj_database_url.parse(
-            _database_url,
-            conn_max_age=0,              # Compatible con Supabase pooler
-            conn_health_checks=True,
-            ssl_require=True,            # Supabase requiere SSL
-        )
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _parsed.path.lstrip('/'),
+            'USER': _parsed.username,
+            'PASSWORD': _parsed.password,
+            'HOST': _parsed.hostname,
+            'PORT': _parsed.port or 5432,
+            'CONN_MAX_AGE': 0,
+            'CONN_HEALTH_CHECKS': True,
+            'DISABLE_SERVER_SIDE_CURSORS': True,
+            'OPTIONS': {
+                'sslmode': 'require',
+            },
+        }
     }
-    # Requerido para Supabase pooler — evita errores de prepared statements
-    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
-    DATABASES['default'].setdefault('OPTIONS', {})['sslmode'] = 'require'
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
