@@ -13,18 +13,45 @@ class UsuarioAdmin(UserAdmin):
     list_per_page = 25
     ordering = ['-date_joined']
 
-    fieldsets = UserAdmin.fieldsets + (
-        ('Norware — Rol y Contacto', {
-            'fields': ('rol', 'telefono'),
-            'classes': ('wide',),
+    # Formulario de edición
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Datos personales', {'fields': ('first_name', 'last_name', 'email', 'telefono')}),
+        ('Norware', {
+            'fields': ('rol',),
+            'description': 'Seleccioná el rol que va a tener en la plataforma.',
+        }),
+        ('Permisos Django', {
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'classes': ('collapse',),
+        }),
+        ('Fechas', {
+            'fields': ('last_login', 'date_joined'),
+            'classes': ('collapse',),
         }),
     )
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Norware — Rol y Contacto', {
-            'fields': ('rol', 'telefono'),
+
+    # Formulario de CREACIÓN — todo lo necesario en una sola pantalla
+    add_fieldsets = (
+        (None, {
             'classes': ('wide',),
+            'fields': ('username', 'password1', 'password2'),
+        }),
+        ('Datos personales', {
+            'classes': ('wide',),
+            'fields': ('first_name', 'last_name', 'email', 'telefono'),
+        }),
+        ('Rol en Norware', {
+            'classes': ('wide',),
+            'fields': ('rol',),
+            'description': (
+                'Para crear un DUEÑO de boliche, elegí "Dueño". '
+                'Después el dueño puede crear sus propios RRPP desde la plataforma.'
+            ),
         }),
     )
+
+    actions = ['activar_usuarios', 'desactivar_usuarios']
 
     @admin.display(description='Rol', ordering='rol')
     def rol_badge(self, obj):
@@ -41,3 +68,13 @@ class UsuarioAdmin(UserAdmin):
             'border-radius:4px; font-size:11px; font-weight:bold;">{}</span>',
             color, obj.get_rol_display().upper(),
         )
+
+    @admin.action(description='✓ Activar usuarios seleccionados')
+    def activar_usuarios(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f'{updated} usuario(s) activados.')
+
+    @admin.action(description='✗ Desactivar usuarios seleccionados')
+    def desactivar_usuarios(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f'{updated} usuario(s) desactivados.')
