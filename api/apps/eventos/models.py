@@ -1,18 +1,28 @@
+from django.conf import settings
 from django.db import models
 
 
 class Evento(models.Model):
     ESTADOS = [('activo', 'Activo'), ('cancelado', 'Cancelado')]
 
+    organizador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='eventos',
+        help_text='Usuario dueño/organizador del evento',
+    )
     boliche = models.ForeignKey(
         'boliches.Boliche',
         on_delete=models.PROTECT,
         related_name='eventos',
+        blank=True,
+        null=True,
+        help_text='Boliche asociado (opcional para esta versión)',
     )
     nombre = models.CharField(max_length=200)
     fecha = models.DateTimeField()
     aforo_max = models.PositiveIntegerField()
-    color_pulsera = models.CharField(max_length=50)
+    color_pulsera = models.CharField(max_length=50, blank=True, default='amarilla')
     precio_base = models.DecimalField(max_digits=10, decimal_places=2)
     line_up = models.JSONField(default=list, blank=True)
     habilitar_lista = models.BooleanField(

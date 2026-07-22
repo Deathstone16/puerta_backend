@@ -25,7 +25,7 @@ class EventoListView(ListAPIView):
     serializer_class = EventoListSerializer
 
     def get_queryset(self):
-        qs = Evento.objects.select_related('boliche').all()
+        qs = Evento.objects.select_related('organizador').all()
         estado = self.request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado=estado)
@@ -37,16 +37,15 @@ class EventoListView(ListAPIView):
 class EventoDetailView(RetrieveAPIView):
     """
     GET /api/eventos/:id/ — Detalle público.
-    PATCH /api/eventos/:id/ — Editar (IsDueno, solo su boliche).
+    PATCH /api/eventos/:id/ — Editar (IsDueno, solo sus eventos).
     DELETE bloqueado.
     """
 
     permission_classes = [AllowAny]
     serializer_class = EventoDetailSerializer
-    queryset = Evento.objects.select_related('boliche').all()
+    queryset = Evento.objects.select_related('organizador').all()
 
     def patch(self, request, *args, **kwargs):
-        # Verificar auth
         if not request.user.is_authenticated or request.user.rol != 'dueno':
             return Response(status=status.HTTP_403_FORBIDDEN)
 
@@ -58,7 +57,7 @@ class EventoDetailView(RetrieveAPIView):
                 status=status.HTTP_405_METHOD_NOT_ALLOWED,
             )
 
-        if evento.boliche.dueno != request.user:
+        if evento.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         serializer = EventoDetailSerializer(evento, data=request.data, partial=True)
@@ -80,10 +79,7 @@ class EventoCreateView(CreateAPIView):
     serializer_class = EventoDetailSerializer
 
     def perform_create(self, serializer):
-        boliche = serializer.validated_data.get('boliche')
-        if boliche.dueno != self.request.user:
-            raise PermissionDenied('No podés crear eventos en un boliche que no es tuyo.')
-        serializer.save()
+        serializer.save(organizador=self.request.user)
 
 
 # ─── Cancelar evento ─────────────────────────────────────────────────────────
@@ -107,7 +103,7 @@ class EventoCancelarView(APIView):
 
     def post(self, request, pk):
         try:
-            evento = Evento.objects.select_related('boliche').get(pk=pk)
+            evento = Evento.objects.select_related('organizador').get(pk=pk)
         except Evento.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -117,7 +113,7 @@ class EventoCancelarView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        if evento.boliche.dueno != request.user:
+        if evento.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         motivo = request.data.get('motivo', '').strip()

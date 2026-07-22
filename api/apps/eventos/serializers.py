@@ -1,37 +1,30 @@
 from rest_framework import serializers
 
-from apps.boliches.models import Boliche
-
 from .models import Evento
 from .utils import calcular_precio_publicado
 
 
-class BolicheResumenSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    nombre = serializers.CharField(read_only=True)
-    direccion = serializers.CharField(read_only=True)
-
-
 class EventoListSerializer(serializers.ModelSerializer):
     precio_publicado = serializers.SerializerMethodField()
-    boliche = BolicheResumenSerializer(read_only=True)
-    boliche_id = serializers.PrimaryKeyRelatedField(
-        source='boliche',
-        queryset=Boliche.objects.all(),
-        write_only=True,
-    )
+    organizador_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = Evento
         fields = [
             'id', 'nombre', 'fecha', 'color_pulsera',
             'precio_base', 'precio_publicado', 'aforo_max',
-            'estado', 'habilitar_lista', 'boliche', 'boliche_id',
+            'estado', 'habilitar_lista', 'organizador_nombre',
         ]
-        read_only_fields = ['id', 'estado']
+        read_only_fields = ['id', 'estado', 'organizador_nombre']
 
     def get_precio_publicado(self, obj):
         return calcular_precio_publicado(obj.precio_base)['precio_publicado']
+
+    def get_organizador_nombre(self, obj):
+        if obj.organizador:
+            nombre = f"{obj.organizador.first_name} {obj.organizador.last_name}".strip()
+            return nombre if nombre else obj.organizador.username
+        return None
 
 
 class EventoDetailSerializer(EventoListSerializer):

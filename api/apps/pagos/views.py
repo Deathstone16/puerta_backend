@@ -264,9 +264,9 @@ class RecaudacionView(APIView):
     permission_classes = [IsDueno]
 
     def get(self, request, evento_id):
-        evento = get_object_or_404(Evento.objects.select_related('boliche'), pk=evento_id)
+        evento = get_object_or_404(Evento.objects.select_related('organizador'), pk=evento_id)
 
-        if evento.boliche.dueno != request.user:
+        if evento.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         qs = Asistente.objects.filter(evento=evento, estado='ingresado_final')
@@ -312,9 +312,9 @@ class RankingRRPPView(APIView):
     permission_classes = [IsDueno]
 
     def get(self, request, evento_id):
-        evento = get_object_or_404(Evento.objects.select_related('boliche'), pk=evento_id)
+        evento = get_object_or_404(Evento.objects.select_related('organizador'), pk=evento_id)
 
-        if evento.boliche.dueno != request.user:
+        if evento.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         from apps.rrpp.models import AsignacionRRPP
