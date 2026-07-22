@@ -1,5 +1,7 @@
 from django.urls import path
 
+from apps.cuentas.views import OrganizadorDetailView, OrganizadorListCreateView
+
 from .views import (
     MetricasAdminView,
     PreferenciaView,
@@ -25,4 +27,6 @@ dashboard_pagos_urlpatterns = [
 
 admin_urlpatterns = [
     path('metricas/', MetricasAdminView.as_view(), name='admin-metricas'),
+    path('organizadores/', OrganizadorListCreateView.as_view(), name='admin-organizadores'),
+    path('organizadores/<int:pk>/', OrganizadorDetailView.as_view(), name='admin-organizador-detail'),
 ]

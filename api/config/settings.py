@@ -190,7 +190,7 @@ CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:5173',
 ).split(',')
-CORS_ALLOW_METHODS = ['GET', 'POST', 'PATCH', 'OPTIONS']
+CORS_ALLOW_METHODS = ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
 CORS_ALLOW_HEADERS = [
     'authorization',
     'content-type',
