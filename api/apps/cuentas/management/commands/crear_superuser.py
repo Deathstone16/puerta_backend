@@ -1,7 +1,8 @@
 """
-Management command para crear el superuser automáticamente en deploy.
+Management command para crear/actualizar el superuser en deploy.
 Lee ADMIN_USERNAME y ADMIN_PASSWORD de las variables de entorno.
-Si el usuario ya existe, no hace nada (idempotente).
+Si el usuario ya existe, actualiza su password y flags.
+Idempotente — seguro de correr en cada deploy.
 
 Uso:
     python manage.py crear_superuser
@@ -17,7 +18,7 @@ from apps.cuentas.models import Usuario
 
 
 class Command(BaseCommand):
-    help = 'Crea el superuser si no existe (lee credenciales de env vars)'
+    help = 'Crea o actualiza el superuser (lee credenciales de env vars)'
 
     def handle(self, *args, **options):
         username = os.environ.get('ADMIN_USERNAME', 'admin')
@@ -30,18 +31,49 @@ class Command(BaseCommand):
             ))
             return
 
-        if Usuario.objects.filter(username=username).exists():
-            self.stdout.write(self.style.SUCCESS(
-                f'Superuser "{username}" ya existe. No se crea de nuevo.'
-            ))
-            return
-
-        Usuario.objects.create_superuser(
+        user, created = Usuario.objects.get_or_create(
             username=username,
-            email=email,
-            password=password,
-            rol='superadmin',
+            defaults={
+                'email': email,
+                'rol': 'superadmin',
+                'is_staff': True,
+                'is_superuser': True,
+                'is_active': True,
+            },
         )
-        self.stdout.write(self.style.SUCCESS(
-            f'Superuser "{username}" creado exitosamente con rol superadmin.'
-        ))
+
+        if created:
+            user.set_password(password)
+            user.save()
+            self.stdout.write(self.style.SUCCESS(
+                f'Superuser "{username}" creado exitosamente.'
+            ))
+        else:
+            # Asegurar que el usuario existente tenga los flags correctos
+            changed = False
+            if not user.is_staff:
+                user.is_staff = True
+                changed = True
+            if not user.is_superuser:
+                user.is_superuser = True
+                changed = True
+            if not user.is_active:
+                user.is_active = True
+                changed = True
+            if user.rol != 'superadmin':
+                user.rol = 'superadmin'
+                changed = True
+
+            # Siempre actualizar la password por si cambió en env vars
+            user.set_password(password)
+            changed = True
+
+            if changed:
+                user.save()
+                self.stdout.write(self.style.SUCCESS(
+                    f'Superuser "{username}" actualizado (password + flags).'
+                ))
+            else:
+                self.stdout.write(self.style.SUCCESS(
+                    f'Superuser "{username}" ya está correctamente configurado.'
+                ))
