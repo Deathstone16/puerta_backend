@@ -83,7 +83,7 @@ class RRPPCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        boliche = self.context['boliche']
+        organizador = self.context['organizador']
         with transaction.atomic():
             user = User.objects.create_user(
                 username=validated_data['username'],
@@ -95,7 +95,7 @@ class RRPPCreateSerializer(serializers.Serializer):
             )
             rrpp = RRPP.objects.create(
                 usuario=user,
-                boliche=boliche,
+                organizador=organizador,
                 tipo_comision=validated_data['tipo_comision'],
                 valor_comision=validated_data['valor_comision'],
             )

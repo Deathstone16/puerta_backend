@@ -15,10 +15,19 @@ class RRPP(models.Model):
         on_delete=models.CASCADE,
         related_name='perfil_rrpp',
     )
+    organizador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='rrpps',
+        help_text='Dueño/organizador que creó este RRPP',
+    )
     boliche = models.ForeignKey(
         'boliches.Boliche',
         on_delete=models.PROTECT,
         related_name='rrpps',
+        blank=True,
+        null=True,
+        help_text='Boliche asociado (opcional para esta versión)',
     )
     tipo_comision = models.CharField(max_length=20, choices=TIPO_COMISION)
     valor_comision = models.DecimalField(max_digits=10, decimal_places=2)
@@ -29,7 +38,8 @@ class RRPP(models.Model):
 
     def __str__(self):
         nombre = self.usuario.get_full_name() or self.usuario.username
-        return f"{nombre} — {self.boliche.nombre}"
+        org = self.organizador.get_full_name() or self.organizador.username
+        return f"{nombre} — {org}"
 
 
 class AsignacionRRPP(models.Model):

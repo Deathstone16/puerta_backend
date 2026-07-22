@@ -3,7 +3,6 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.boliches.models import Boliche
 from apps.cuentas.permissions import IsDueno, IsRRPP
 from apps.eventos.models import Evento
 
@@ -18,35 +17,20 @@ from .serializers import (
 
 class RRPPListCreateView(APIView):
     """
-    GET /api/rrpp/ — Lista RRPP del boliche del dueño.
+    GET /api/rrpp/ — Lista RRPP del organizador.
     POST /api/rrpp/ — Alta de RRPP (transacción atómica).
     """
 
     permission_classes = [IsDueno]
 
-    def _get_boliche(self, user):
-        try:
-            return Boliche.objects.get(dueno=user)
-        except Boliche.DoesNotExist:
-            return None
-
     def get(self, request):
-        boliche = self._get_boliche(request.user)
-        if not boliche:
-            return Response([], status=status.HTTP_200_OK)
-        rrpps = RRPP.objects.filter(boliche=boliche).select_related('usuario').prefetch_related(
+        rrpps = RRPP.objects.filter(organizador=request.user).select_related('usuario').prefetch_related(
             'asignaciones__evento', 'asignaciones__links',
         )
         return Response(RRPPSerializer(rrpps, many=True).data)
 
     def post(self, request):
-        boliche = self._get_boliche(request.user)
-        if not boliche:
-            return Response(
-                {'error': 'Primero debés crear un boliche.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        serializer = RRPPCreateSerializer(data=request.data, context={'boliche': boliche})
+        serializer = RRPPCreateSerializer(data=request.data, context={'organizador': request.user})
         if serializer.is_valid():
             rrpp = serializer.save()
             return Response(RRPPSerializer(rrpp).data, status=status.HTTP_201_CREATED)
@@ -61,9 +45,8 @@ class AsignarEventoView(APIView):
     def post(self, request, pk):
         rrpp = get_object_or_404(RRPP, pk=pk)
 
-        # Verificar que el RRPP pertenece al boliche del dueño
-        boliche = rrpp.boliche
-        if boliche.dueno != request.user:
+        # Verificar que el RRPP pertenece al organizador autenticado
+        if rrpp.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
         evento_id = request.data.get('evento_id')
@@ -81,9 +64,9 @@ class AsignarEventoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if evento.boliche != boliche:
+        if evento.organizador != request.user:
             return Response(
-                {'error': 'El evento no pertenece a tu boliche.'},
+                {'error': 'El evento no te pertenece.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
