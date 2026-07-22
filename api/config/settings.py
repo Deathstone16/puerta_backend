@@ -80,10 +80,14 @@ if _database_url:
     DATABASES = {
         'default': dj_database_url.parse(
             _database_url,
-            conn_max_age=600,
+            conn_max_age=0,              # Compatible con Supabase pooler
             conn_health_checks=True,
+            ssl_require=True,            # Supabase requiere SSL
         )
     }
+    # Requerido para Supabase pooler — evita errores de prepared statements
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['default'].setdefault('OPTIONS', {})['sslmode'] = 'require'
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -98,6 +102,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 FIXTURE_DIRS = [BASE_DIR / 'fixtures']
 
