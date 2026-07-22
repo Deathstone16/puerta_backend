@@ -17,6 +17,11 @@ from apps.puerta.urls import (
     lista_urlpatterns,
 )
 
+# Personalizar admin
+admin.site.site_header = 'Norware — Panel de administración'
+admin.site.site_title = 'Norware Admin'
+admin.site.index_title = 'Gestión de la plataforma'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.cuentas.urls')),

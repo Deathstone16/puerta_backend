@@ -39,14 +39,20 @@ class AsignacionConEstadisticasSerializer(serializers.ModelSerializer):
         try:
             from apps.puerta.models import Asistente
             qs = Asistente.objects.filter(link_rrpp__asignacion=asignacion)
+            invitados_recientes = list(
+                qs.order_by('-created_at')[:20].values(
+                    'id', 'nombre', 'apellido', 'dni', 'instagram', 'estado', 'created_at',
+                )
+            )
             return {
                 'anotados': qs.count(),
                 'ingresados': qs.filter(estado='ingresado_final').count(),
                 'pendientes': qs.filter(estado__in=['pendiente', 'aprobado_guardia']).count(),
                 'rebotados': qs.filter(estado='rebotado_guardia').count(),
+                'invitados_recientes': invitados_recientes,
             }
         except Exception:
-            return {'anotados': 0, 'ingresados': 0, 'pendientes': 0, 'rebotados': 0}
+            return {'anotados': 0, 'ingresados': 0, 'pendientes': 0, 'rebotados': 0, 'invitados_recientes': []}
 
 
 class RRPPSerializer(serializers.ModelSerializer):

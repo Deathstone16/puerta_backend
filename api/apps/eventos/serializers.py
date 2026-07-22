@@ -26,7 +26,7 @@ class EventoListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'nombre', 'fecha', 'color_pulsera',
             'precio_base', 'precio_publicado', 'aforo_max',
-            'estado', 'boliche', 'boliche_id',
+            'estado', 'habilitar_lista', 'boliche', 'boliche_id',
         ]
         read_only_fields = ['id', 'estado']
 

@@ -15,6 +15,10 @@ class Evento(models.Model):
     color_pulsera = models.CharField(max_length=50)
     precio_base = models.DecimalField(max_digits=10, decimal_places=2)
     line_up = models.JSONField(default=list, blank=True)
+    habilitar_lista = models.BooleanField(
+        default=True,
+        help_text='Indica si el evento permite listas RRPP o solo venta anticipada web',
+    )
     estado = models.CharField(max_length=20, choices=ESTADOS, default='activo')
     motivo_cancelacion = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -31,6 +31,10 @@ class Asistente(models.Model):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     dni = models.CharField(max_length=20)
+    instagram = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='Username de Instagram del asistente',
+    )
     tipo_ingreso = models.CharField(max_length=20, choices=TIPO_INGRESO)
     estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
     metodo_pago = models.CharField(

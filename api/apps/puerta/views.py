@@ -44,6 +44,7 @@ class ListaInfoView(APIView):
                 'fecha': evento.fecha,
                 'boliche': evento.boliche.nombre,
                 'color_pulsera': evento.color_pulsera,
+                'habilitar_lista': evento.habilitar_lista,
             },
             'rrpp_nombre': rrpp_user.get_full_name() or rrpp_user.username,
             'link_activo': True,
@@ -75,6 +76,7 @@ class ListaAnotarView(EventoActivoMixin, APIView):
         nombre = request.data.get('nombre', '').strip()
         apellido = request.data.get('apellido', '').strip()
         dni = request.data.get('dni', '').strip()
+        instagram = request.data.get('instagram', '').strip()
 
         if not all([nombre, apellido, dni]):
             return Response(
@@ -94,6 +96,7 @@ class ListaAnotarView(EventoActivoMixin, APIView):
             nombre=nombre,
             apellido=apellido,
             dni=dni,
+            instagram=instagram,
             tipo_ingreso='lista_rrpp',
             estado='pendiente',
         )
@@ -102,10 +105,11 @@ class ListaAnotarView(EventoActivoMixin, APIView):
             'id': asistente.id,
             'nombre': f"{asistente.nombre} {asistente.apellido}",
             'dni': asistente.dni,
+            'instagram': asistente.instagram,
             'estado': asistente.estado,
             'evento': evento.nombre,
             'rrpp_nombre': link.asignacion.rrpp.usuario.get_full_name(),
-            'mensaje': 'Te anotamos. Presentate en la puerta con tu DNI.',
+            'mensaje': 'Te anotamos. El RRPP va a validar tu solicitud.',
         }, status=status.HTTP_201_CREATED)
 
 

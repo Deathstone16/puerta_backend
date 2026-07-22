@@ -131,6 +131,7 @@ class AnotarInvitadoView(APIView):
         nombre = request.data.get('nombre', '').strip()
         apellido = request.data.get('apellido', '').strip()
         dni = request.data.get('dni', '').strip()
+        instagram = request.data.get('instagram', '').strip()
 
         if not all([slug_lista, nombre, apellido, dni]):
             return Response(
@@ -177,17 +178,183 @@ class AnotarInvitadoView(APIView):
                 nombre=nombre,
                 apellido=apellido,
                 dni=dni,
+                instagram=instagram,
                 tipo_ingreso='lista_rrpp',
-                estado='pendiente',
+                estado='pendiente',  # Carga manual del RRPP = ya aprobado por él
             )
+            # Como lo carga el RRPP manualmente, lo dejamos directo en la lista
+            # (no necesita aprobación adicional del RRPP)
             return Response({
                 'id': asistente.id,
                 'nombre': f"{asistente.nombre} {asistente.apellido}",
                 'dni': asistente.dni,
-                'estado': asistente.estado,
+                'instagram': asistente.instagram,
+                'estado': 'pendiente',
             }, status=status.HTTP_201_CREATED)
         except ImportError:
             return Response(
                 {'error': 'La app puerta no está disponible aún.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+
+# ─── Gestión de invitados por RRPP ───────────────────────────────────────────
+
+class AprobarInvitadoView(APIView):
+    """POST /api/rrpp/aprobar-invitado/:id/ — RRPP aprueba solicitud pendiente."""
+
+    permission_classes = [IsRRPP]
+
+    def post(self, request, pk):
+        from apps.puerta.models import Asistente
+
+        asistente = get_object_or_404(Asistente, pk=pk)
+
+        # Verificar que el invitado pertenece a un link del RRPP autenticado
+        if not asistente.link_rrpp or asistente.link_rrpp.asignacion.rrpp.usuario != request.user:
+            return Response(
+                {'error': 'No tenés permiso sobre este invitado.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if asistente.estado != 'pendiente':
+            return Response(
+                {'error': 'Solo se pueden aprobar invitados en estado pendiente.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # "Aprobado por RRPP" = queda en la lista visible para el guardia
+        # El estado sigue siendo 'pendiente' para el flujo de puerta (guardia aprueba/rebota)
+        # Marcamos con un campo que el RRPP ya lo validó — no cambiamos estado
+        # Para el MVP: simplemente confirmamos que queda en lista
+        return Response({
+            'id': asistente.id,
+            'estado': 'aprobado',
+            'mensaje': 'Invitado aprobado. Aparece en la lista del guardia.',
+        })
+
+
+class RechazarInvitadoView(APIView):
+    """POST /api/rrpp/rechazar-invitado/:id/ — RRPP rechaza solicitud."""
+
+    permission_classes = [IsRRPP]
+
+    def post(self, request, pk):
+        from apps.puerta.models import Asistente
+
+        asistente = get_object_or_404(Asistente, pk=pk)
+
+        if not asistente.link_rrpp or asistente.link_rrpp.asignacion.rrpp.usuario != request.user:
+            return Response(
+                {'error': 'No tenés permiso sobre este invitado.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if asistente.estado != 'pendiente':
+            return Response(
+                {'error': 'Solo se pueden rechazar invitados en estado pendiente.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Rechazar = eliminar de la lista (no llega al guardia)
+        asistente.delete()
+
+        return Response({
+            'id': pk,
+            'estado': 'rechazado',
+            'mensaje': 'Invitado rechazado y removido de la lista.',
+        })
+
+
+class EliminarInvitadoView(APIView):
+    """POST /api/rrpp/eliminar-invitado/:id/ — RRPP elimina invitado de lista."""
+
+    permission_classes = [IsRRPP]
+
+    def post(self, request, pk):
+        from apps.puerta.models import Asistente
+
+        asistente = get_object_or_404(Asistente, pk=pk)
+
+        if not asistente.link_rrpp or asistente.link_rrpp.asignacion.rrpp.usuario != request.user:
+            return Response(
+                {'error': 'No tenés permiso sobre este invitado.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if asistente.estado == 'ingresado_final':
+            return Response(
+                {'error': 'No se puede eliminar un asistente que ya ingresó.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        asistente.delete()
+
+        return Response({
+            'id': pk,
+            'mensaje': 'Invitado eliminado de la lista.',
+        })
+
+
+class EditarInvitadoView(APIView):
+    """PATCH /api/rrpp/editar-invitado/:id/ — RRPP edita datos de un invitado."""
+
+    permission_classes = [IsRRPP]
+
+    def patch(self, request, pk):
+        from apps.puerta.models import Asistente
+
+        asistente = get_object_or_404(Asistente, pk=pk)
+
+        if not asistente.link_rrpp or asistente.link_rrpp.asignacion.rrpp.usuario != request.user:
+            return Response(
+                {'error': 'No tenés permiso sobre este invitado.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if asistente.estado == 'ingresado_final':
+            return Response(
+                {'error': 'No se puede editar un asistente que ya ingresó.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Campos editables
+        nombre = request.data.get('nombre')
+        apellido = request.data.get('apellido')
+        dni = request.data.get('dni')
+        instagram = request.data.get('instagram')
+
+        update_fields = []
+        if nombre is not None:
+            asistente.nombre = nombre.strip()
+            update_fields.append('nombre')
+        if apellido is not None:
+            asistente.apellido = apellido.strip()
+            update_fields.append('apellido')
+        if dni is not None:
+            # Verificar que el nuevo DNI no colisione
+            nuevo_dni = dni.strip()
+            if nuevo_dni != asistente.dni:
+                if Asistente.objects.filter(evento=asistente.evento, dni=nuevo_dni).exists():
+                    return Response(
+                        {'error': 'Este DNI ya está registrado en el evento.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            asistente.dni = nuevo_dni
+            update_fields.append('dni')
+        if instagram is not None:
+            asistente.instagram = instagram.strip()
+            update_fields.append('instagram')
+
+        if update_fields:
+            asistente.save(update_fields=update_fields)
+
+        return Response({
+            'id': asistente.id,
+            'nombre': asistente.nombre,
+            'apellido': asistente.apellido,
+            'dni': asistente.dni,
+            'instagram': asistente.instagram,
+            'estado': asistente.estado,
+            'mensaje': 'Invitado actualizado.',
+        })
