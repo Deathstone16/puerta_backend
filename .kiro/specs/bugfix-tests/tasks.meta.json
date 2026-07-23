@@ -1,0 +1,107 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Agregar método `delete` al módulo API": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571565
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834580037
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834797956
+      }
+    ],
+    "2. Actualizar DashboardPage.test.jsx": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571657
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834805847
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835042591
+      }
+    ],
+    "3. Actualizar MetricasTab.test.jsx": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571703
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835049666
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835152315
+      }
+    ],
+    "4. Actualizar AdminPage.test.jsx": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571723
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835159765
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835265143
+      }
+    ],
+    "5. Actualizar RrppFormModal.test.jsx": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571747
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835272746
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835746676
+      }
+    ],
+    "6. Verificación final": [
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784834571778
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835755652
+      },
+      {
+        "executionId": "23d6ea00-39e8-4237-b3e0-4aacecea8589",
+        "chatSessionId": "sess_f8d5191c-ced4-429c-b14f-647a7d1667af",
+        "timestamp": 1784835886996
+      }
+    ]
+  }
+}
