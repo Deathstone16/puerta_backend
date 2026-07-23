@@ -1,6 +1,13 @@
 from django.urls import path
 
-from .views import BolicheDetailView, BolicheMioView, BolichesView, MPCallbackView, MPConnectView
+from .views import (
+    BolicheDetailView,
+    BolicheMioView,
+    BolichesView,
+    MPCallbackView,
+    MPConnectView,
+    MPDisconnectView,
+)
 
 urlpatterns = [
     path('', BolichesView.as_view(), name='boliches-list'),
@@ -8,4 +15,5 @@ urlpatterns = [
     path('<int:pk>/', BolicheDetailView.as_view(), name='boliche-detail'),
     path('mp/connect/', MPConnectView.as_view(), name='mp-connect'),
     path('mp/callback/', MPCallbackView.as_view(), name='mp-callback'),
+    path('mp/disconnect/', MPDisconnectView.as_view(), name='mp-disconnect'),
 ]

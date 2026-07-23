@@ -224,3 +224,38 @@ def refresh_mp_token(boliche: Boliche) -> bool:
     boliche.mp_connected_at = timezone.now()
     boliche.save(update_fields=['mp_access_token', 'mp_refresh_token', 'mp_connected_at'])
     return True
+
+
+class MPDisconnectView(APIView):
+    """
+    POST /api/boliches/mp/disconnect/
+    Desconecta la cuenta de Mercado Pago del boliche del dueño.
+    Limpia tokens y permite reconectar con otra cuenta.
+    """
+
+    permission_classes = [IsDueno]
+
+    def post(self, request):
+        try:
+            boliche = Boliche.objects.get(dueno=request.user)
+        except Boliche.DoesNotExist:
+            return Response(
+                {'error': 'No tenés ningún boliche registrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not boliche.mp_connected:
+            return Response(
+                {'error': 'No hay cuenta de Mercado Pago conectada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        boliche.mp_access_token = None
+        boliche.mp_refresh_token = None
+        boliche.mp_user_id = None
+        boliche.mp_connected_at = None
+        boliche.save(update_fields=[
+            'mp_access_token', 'mp_refresh_token', 'mp_user_id', 'mp_connected_at',
+        ])
+
+        return Response({'mensaje': 'Cuenta de Mercado Pago desconectada correctamente.'})
