@@ -99,11 +99,17 @@ class AsignarEventoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if AsignacionRRPP.objects.filter(rrpp=rrpp, evento=evento).exists():
-            return Response(
-                {'error': 'El RRPP ya está asignado a este evento.'},
-                status=status.HTTP_409_CONFLICT,
-            )
+        # Si ya existe una asignación activa, informar amigablemente
+        existing = AsignacionRRPP.objects.filter(rrpp=rrpp, evento=evento).first()
+        if existing and existing.activa:
+            return Response({
+                'asignacion_id': existing.id,
+                'rrpp_nombre': str(rrpp),
+                'evento_nombre': evento.nombre,
+                'tipo_comision': existing.tipo_comision,
+                'valor_comision': float(existing.valor_comision),
+                'ya_asignado': True,
+            }, status=status.HTTP_200_OK)
 
         # Comisión por evento (obligatoria al asignar)
         tipo_comision = request.data.get('tipo_comision')
@@ -129,11 +135,19 @@ class AsignarEventoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        asignacion = AsignacionRRPP.objects.create(
-            rrpp=rrpp, evento=evento,
-            tipo_comision=tipo_comision,
-            valor_comision=valor_comision,
-        )
+        # Reactivar asignación existente inactiva, o crear nueva
+        if existing and not existing.activa:
+            existing.activa = True
+            existing.tipo_comision = tipo_comision
+            existing.valor_comision = valor_comision
+            existing.save(update_fields=['activa', 'tipo_comision', 'valor_comision'])
+            asignacion = existing
+        else:
+            asignacion = AsignacionRRPP.objects.create(
+                rrpp=rrpp, evento=evento,
+                tipo_comision=tipo_comision,
+                valor_comision=valor_comision,
+            )
 
         return Response({
             'asignacion_id': asignacion.id,

@@ -29,6 +29,9 @@ class EventoListView(ListAPIView):
         estado = self.request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado=estado)
+        # Filter by authenticated organizer if requested
+        if self.request.query_params.get('mis_eventos') and self.request.user.is_authenticated:
+            qs = qs.filter(organizador=self.request.user)
         return qs
 
 
