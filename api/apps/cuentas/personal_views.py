@@ -127,23 +127,32 @@ class PersonalListCreateView(APIView):
 
 
 class PersonalAsignarEventoView(APIView):
-    """POST /api/personal/:id/asignar-evento/ — Assign personnel to an event."""
+    """
+    POST   /api/personal/:id/asignar-evento/ — Assign personnel to an event.
+    DELETE /api/personal/:id/asignar-evento/ — Unassign personnel from an event.
+    """
 
     permission_classes = [IsDueno]
+
+    def _resolve_user_and_rrpp(self, request, pk):
+        """Returns (user, rrpp_or_None) or raises 403."""
+        user = get_object_or_404(Usuario, pk=pk)
+        rrpp = None
+        if user.rol == 'rrpp':
+            rrpp = RRPP.objects.filter(usuario=user, organizador=request.user).first()
+            if not rrpp:
+                return None, None
+        else:
+            if user.organizador != request.user:
+                return None, None
+        return user, rrpp
 
     def post(self, request, pk):
         from apps.eventos.models import Evento
 
-        user = get_object_or_404(Usuario, pk=pk)
-
-        # Verify this person belongs to the requesting owner
-        if user.rol == 'rrpp':
-            rrpp = RRPP.objects.filter(usuario=user, organizador=request.user).first()
-            if not rrpp:
-                return Response(status=status.HTTP_403_FORBIDDEN)
-        else:
-            if user.organizador != request.user:
-                return Response(status=status.HTTP_403_FORBIDDEN)
+        user, rrpp = self._resolve_user_and_rrpp(request, pk)
+        if user is None:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         evento_id = request.data.get('evento_id')
         if not evento_id:
@@ -222,6 +231,48 @@ class PersonalAsignarEventoView(APIView):
             'evento_nombre': evento.nombre,
             'rol': user.rol,
         }, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk):
+        from apps.eventos.models import Evento
+
+        user, rrpp = self._resolve_user_and_rrpp(request, pk)
+        if user is None:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        evento_id = request.data.get('evento_id')
+        if not evento_id:
+            return Response(
+                {'error': 'El campo evento_id es obligatorio.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            evento = Evento.objects.get(pk=evento_id, organizador=request.user)
+        except Evento.DoesNotExist:
+            return Response(
+                {'error': 'El evento no existe o no te pertenece.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.rol == 'rrpp':
+            from apps.rrpp.models import AsignacionRRPP
+            updated = AsignacionRRPP.objects.filter(
+                rrpp=rrpp, evento=evento, activa=True,
+            ).update(activa=False)
+        else:
+            updated = AsignacionStaff.objects.filter(
+                usuario=user, evento=evento, activa=True,
+            ).update(activa=False)
+
+        if not updated:
+            return Response(
+                {'error': 'No se encontró una asignación activa para desasignar.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response({
+            'mensaje': f'{user.get_full_name()} desasignado de {evento.nombre}.',
+        })
 
 
 class PersonalDetailView(APIView):
