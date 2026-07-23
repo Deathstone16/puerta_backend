@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from apps.cuentas.urls import personal_urlpatterns, staff_urlpatterns
 from apps.eventos.urls import evento_urlpatterns, precio_urlpatterns
 from apps.pagos.urls import (
     admin_urlpatterns,
@@ -25,6 +26,8 @@ admin.site.index_title = 'Gestión de la plataforma'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.cuentas.urls')),
+    path('api/staff/', include(staff_urlpatterns)),
+    path('api/personal/', include(personal_urlpatterns)),
     path('api/boliches/', include('apps.boliches.urls')),
     path('api/eventos/', include(evento_urlpatterns)),
     path('api/precios/', include(precio_urlpatterns)),

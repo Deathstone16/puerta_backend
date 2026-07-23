@@ -320,7 +320,7 @@ class RankingRRPPView(APIView):
         from apps.rrpp.models import AsignacionRRPP
 
         asignaciones = AsignacionRRPP.objects.filter(
-            evento=evento,
+            evento=evento, activa=True,
         ).select_related('rrpp__usuario')
 
         ranking = []
