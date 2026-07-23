@@ -38,9 +38,38 @@ class RRPPListCreateView(APIView):
 
 
 class AsignarEventoView(APIView):
-    """POST /api/rrpp/:id/asignar-evento/ — Asigna RRPP a evento, genera 2 links."""
+    """
+    GET  /api/rrpp/:id/asignar-evento/ — Lista eventos asignables al RRPP.
+    POST /api/rrpp/:id/asignar-evento/ — Asigna RRPP a evento, genera 2 links.
+    """
 
     permission_classes = [IsDueno]
+
+    def get(self, request, pk):
+        rrpp = get_object_or_404(RRPP, pk=pk)
+
+        if rrpp.organizador != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Eventos ya asignados a este RRPP
+        eventos_asignados_ids = AsignacionRRPP.objects.filter(
+            rrpp=rrpp,
+        ).values_list('evento_id', flat=True)
+
+        # Eventos del organizador, activos, no asignados aún
+        eventos_disponibles = Evento.objects.filter(
+            organizador=request.user,
+            estado='activo',
+        ).exclude(
+            id__in=eventos_asignados_ids,
+        ).order_by('-fecha')
+
+        data = [
+            {'id': e.id, 'nombre': e.nombre, 'fecha': e.fecha}
+            for e in eventos_disponibles
+        ]
+
+        return Response(data)
 
     def post(self, request, pk):
         rrpp = get_object_or_404(RRPP, pk=pk)
