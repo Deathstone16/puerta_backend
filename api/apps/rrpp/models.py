@@ -29,8 +29,8 @@ class RRPP(models.Model):
         null=True,
         help_text='Boliche asociado (opcional para esta versión)',
     )
-    tipo_comision = models.CharField(max_length=20, choices=TIPO_COMISION)
-    valor_comision = models.DecimalField(max_digits=10, decimal_places=2)
+    tipo_comision = models.CharField(max_length=20, choices=TIPO_COMISION, blank=True, null=True)
+    valor_comision = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     class Meta:
         verbose_name = 'RRPP'
@@ -48,6 +48,14 @@ class AsignacionRRPP(models.Model):
         'eventos.Evento', on_delete=models.CASCADE, related_name='asignaciones_rrpp',
     )
     activa = models.BooleanField(default=True)
+    tipo_comision = models.CharField(
+        max_length=20, choices=RRPP.TIPO_COMISION, default='fijo',
+        help_text='Tipo de comisión para esta asignación específica',
+    )
+    valor_comision = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Valor de comisión para esta asignación específica',
+    )
 
     class Meta:
         verbose_name = 'Asignación RRPP'

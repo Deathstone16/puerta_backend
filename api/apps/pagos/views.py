@@ -334,16 +334,16 @@ class RankingRRPPView(APIView):
             )
 
             rrpp_obj = asig.rrpp
-            if rrpp_obj.tipo_comision == 'fijo':
-                comision = float(rrpp_obj.valor_comision) * ingresados
+            if asig.tipo_comision == 'fijo':
+                comision = float(asig.valor_comision) * ingresados
             else:
-                comision = recaudado * float(rrpp_obj.valor_comision) / 100
+                comision = recaudado * float(asig.valor_comision) / 100
 
             ranking.append({
                 'rrpp_id': rrpp_obj.id,
                 'nombre': rrpp_obj.usuario.get_full_name() or rrpp_obj.usuario.username,
-                'tipo_comision': rrpp_obj.tipo_comision,
-                'valor_comision': float(rrpp_obj.valor_comision),
+                'tipo_comision': asig.tipo_comision,
+                'valor_comision': float(asig.valor_comision),
                 'anotados': anotados,
                 'ingresados': ingresados,
                 'rebotados': rebotados,

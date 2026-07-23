@@ -105,15 +105,42 @@ class AsignarEventoView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        asignacion = AsignacionRRPP.objects.create(rrpp=rrpp, evento=evento)
-        # La signal post_save genera los 2 links automáticamente
-        links = asignacion.links.all()
+        # Comisión por evento (obligatoria al asignar)
+        tipo_comision = request.data.get('tipo_comision')
+        valor_comision = request.data.get('valor_comision')
+
+        if not tipo_comision or valor_comision is None:
+            return Response(
+                {'error': 'Los campos tipo_comision y valor_comision son obligatorios.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if tipo_comision not in ('fijo', 'porcentaje'):
+            return Response(
+                {'error': 'tipo_comision debe ser "fijo" o "porcentaje".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            valor_comision = float(valor_comision)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'valor_comision debe ser un número.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        asignacion = AsignacionRRPP.objects.create(
+            rrpp=rrpp, evento=evento,
+            tipo_comision=tipo_comision,
+            valor_comision=valor_comision,
+        )
 
         return Response({
             'asignacion_id': asignacion.id,
             'rrpp_nombre': str(rrpp),
             'evento_nombre': evento.nombre,
-            'links': LinkRRPPSerializer(links, many=True).data,
+            'tipo_comision': tipo_comision,
+            'valor_comision': valor_comision,
         }, status=status.HTTP_201_CREATED)
 
 

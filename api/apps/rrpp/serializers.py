@@ -32,7 +32,8 @@ class AsignacionConEstadisticasSerializer(serializers.ModelSerializer):
         model = AsignacionRRPP
         fields = [
             'id', 'evento_id', 'evento_nombre', 'evento_fecha',
-            'color_pulsera', 'activa', 'links', 'estadisticas',
+            'color_pulsera', 'activa', 'tipo_comision', 'valor_comision',
+            'links', 'estadisticas',
         ]
 
     def get_estadisticas(self, asignacion):
@@ -74,8 +75,8 @@ class RRPPCreateSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(max_length=128, write_only=True)
     telefono = serializers.CharField(max_length=20, required=False, allow_blank=True)
-    tipo_comision = serializers.ChoiceField(choices=RRPP.TIPO_COMISION)
-    valor_comision = serializers.DecimalField(max_digits=10, decimal_places=2)
+    tipo_comision = serializers.ChoiceField(choices=RRPP.TIPO_COMISION, required=False, default=None)
+    valor_comision = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=None)
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -96,7 +97,7 @@ class RRPPCreateSerializer(serializers.Serializer):
             rrpp = RRPP.objects.create(
                 usuario=user,
                 organizador=organizador,
-                tipo_comision=validated_data['tipo_comision'],
-                valor_comision=validated_data['valor_comision'],
+                tipo_comision=validated_data.get('tipo_comision'),
+                valor_comision=validated_data.get('valor_comision'),
             )
         return rrpp
