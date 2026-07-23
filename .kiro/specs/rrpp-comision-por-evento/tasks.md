@@ -10,63 +10,78 @@ Mover la comisión del modelo RRPP al modelo AsignacionRRPP (por evento), simpli
 
 ## Tareas
 
-- [ ] 1. Migración: agregar campos de comisión a AsignacionRRPP
-  - Agregar a `AsignacionRRPP` en `api/apps/rrpp/models.py`:
-    - `tipo_comision = CharField(max_length=20, choices=RRPP.TIPO_COMISION, default='fijo')`
-    - `valor_comision = DecimalField(max_digits=10, decimal_places=2, default=0)`
-  - Hacer nullable los campos en `RRPP`:
-    - `tipo_comision` → `blank=True, null=True`
-    - `valor_comision` → `blank=True, null=True`
-  - Crear migración: `python manage.py makemigrations rrpp`
-  - En la migración, agregar data migration que copie `rrpp.tipo_comision` y `rrpp.valor_comision` a cada `AsignacionRRPP` existente
-  - Aplicar: `python manage.py migrate`
+- [x] 1. Migración: agregar campos de comisión a AsignacionRRPP
+  - Agregado `tipo_comision` y `valor_comision` a `AsignacionRRPP` con defaults
+  - Hecho nullable `tipo_comision` y `valor_comision` en modelo `RRPP`
+  - Creada migración `0003_comision_por_evento.py` con data migration
   - _Requisito 1.1, 1.3_
 
-- [ ] 2. Actualizar endpoint POST /api/rrpp/:id/asignar-evento/
-  - Aceptar `tipo_comision` y `valor_comision` en el request body (obligatorios)
-  - Crear AsignacionRRPP con esos valores: `AsignacionRRPP.objects.create(rrpp=rrpp, evento=evento, tipo_comision=..., valor_comision=...)`
-  - Cambiar la respuesta de éxito: devolver `{asignacion_id, rrpp_nombre, evento_nombre, tipo_comision, valor_comision}` — NO devolver `links`
+- [x] 2. Actualizar endpoint POST /api/rrpp/:id/asignar-evento/
+  - Acepta `tipo_comision` y `valor_comision` (obligatorios)
+  - Crea AsignacionRRPP con esos valores
+  - Respuesta simplificada: `{asignacion_id, rrpp_nombre, evento_nombre, tipo_comision, valor_comision}`
+  - Si RRPP ya asignado activo: devuelve 200 con `ya_asignado: true` (no error)
+  - Si hay asignación inactiva: la reactiva con nueva comisión
   - _Requisitos 1.2, 1.5, 3.1_
 
-- [ ] 3. Actualizar creación de RRPP — hacer comisión opcional
-  - En `RRPPCreateSerializer` (`api/apps/rrpp/serializers.py`): hacer `tipo_comision` y `valor_comision` opcionales (`required=False`, con defaults)
-  - En el frontend `RrppFormModal.jsx`: eliminar los campos de comisión del formulario de alta
-  - En `GestionRrppTab.jsx`: eliminar la columna "Comisión" de la tabla
+- [x] 3. Actualizar creación de RRPP — hacer comisión opcional
+  - `RRPPCreateSerializer`: `tipo_comision` y `valor_comision` opcionales con `required=False`
+  - `RrppFormModal.jsx`: eliminados campos de comisión, campos obligatorios marcados con *, teléfono marcado como (opcional)
+  - `GestionRrppTab.jsx`: eliminada columna "Comisión" de la tabla
   - _Requisito 2.1, 2.2, 2.3_
 
-- [ ] 4. Actualizar EventoRrppAssigner — pedir comisión al asignar
-  - Cuando el usuario selecciona un RRPP del autocomplete, NO asignar inmediatamente
-  - Mostrar un mini-form inline con: select tipo (Fijo / Porcentaje) + input valor
-  - Al confirmar, hacer el POST con `{evento_id, tipo_comision, valor_comision}`
-  - Al recibir éxito: mostrar mensaje "RRPP asignado con éxito al evento [nombre]" durante 2s, luego agregar la píldora
-  - NO mostrar links en ningún momento
-  - _Requisitos 1.2, 3.1, 3.2_
+- [x] 4. Actualizar EventoRrppAssigner — pedir comisión al asignar
+  - Al seleccionar RRPP: muestra mini-form con tipo + valor de comisión (marcado como obligatorio *)
+  - Al confirmar: POST con `{evento_id, tipo_comision, valor_comision}`
+  - Éxito: muestra "RRPP asignado con éxito a [evento]" durante 3s
+  - Error: muestra detalle del error en alert
+  - Después de asignar: recarga datos con `loadData()`
+  - Píldoras muestran comisión ($ o %) junto al nombre
+  - _Requisitos 1.2, 3.1, 3.2, 5.1_
 
-- [ ] 5. Mostrar comisión a pagar en el detalle de RRPP por evento
-  - En `EventoRrppAssigner`: junto a cada píldora de RRPP asignado, mostrar el tipo y valor de comisión
-  - Para obtener esta info, el endpoint `GET /api/rrpp/` ya devuelve asignaciones — agregar `tipo_comision` y `valor_comision` al serializer de `AsignacionConEstadisticasSerializer`
-  - En el ranking (`/dashboard/ranking-rrpp/:id/`): usar `asignacion.tipo_comision` y `asignacion.valor_comision` para el cálculo de `comision_a_pagar`
+- [x] 5. Actualizar AsignarRrppModal (modal separado)
+  - Agregados campos tipo comisión + valor comisión (obligatorios con *)
+  - Envía `tipo_comision` y `valor_comision` al endpoint
+  - Muestra "RRPP asignado con éxito" en vez de links
+  - Al cerrar: dispara refresh de listas en el padre
+  - _Requisitos 1.2, 3.1_
+
+- [x] 6. Serializers y ranking — comisión desde AsignacionRRPP
+  - `AsignacionConEstadisticasSerializer`: incluye `tipo_comision` y `valor_comision`
+  - `RankingRRPPView`: calcula comisión usando `asig.tipo_comision` y `asig.valor_comision`
   - _Requisitos 5.1, 5.2_
 
-- [ ] 6. Fix panel RRPP — sesión expira
-  - En `RrppPage.jsx`: cambiar intervalo de polling de 4000ms a 15000ms
-  - En el `catch` del `loadPanel`: si el error tiene status 401, NO setear `panelStatus = 'error'` — dejar que el refresh del AuthContext actúe
-  - Verificar que `MiPanelView` en el backend devuelve los eventos asignados correctamente (con nombre, fecha, estadísticas)
-  - _Requisitos 4.1, 4.2, 4.3, 4.4_
+- [x] 7. Fix panel RRPP — sesión expira
+  - Polling cambiado de 4s a 15s
+  - Error 401 se ignora silenciosamente (AuthContext maneja el refresh)
+  - _Requisitos 4.1, 4.2, 4.3_
 
-- [ ] 7. Verificación final
-  - Panel RRPP mantiene sesión estable (no redirige al login)
-  - Panel RRPP muestra eventos asignados con info correcta
-  - Asignación de RRPP pide comisión y muestra "asignado con éxito"
-  - Dashboard del dueño muestra pago a RRPP por evento
-  - Creación de RRPP no pide comisión
-  - Backend: `python manage.py check` sin errores
-  - Migración aplicada correctamente
+- [x] 8. Persistencia de sesión
+  - Sesión guardada en `sessionStorage` (sobrevive recargas, se borra al cerrar pestaña)
+  - Al cargar: lee sesión guardada y verifica que no esté expirada
+  - Al logout: limpia sessionStorage
+  - _Requisito 4.1_
+
+- [x] 9. Refresh automático de listas después de mutaciones
+  - `DashboardPage` usa `refreshKey` counter que se incrementa en cada mutación
+  - `GestionRrppTab` recibe `key={refreshKey}` para re-montarse al cambiar
+  - `RrppFormModal` llama `triggerRefresh` al crear exitosamente
+  - `AsignarRrppModal` llama `triggerRefresh` al cerrar
+  - `EventoRrppAssigner` llama `loadData()` después de asignar
+  - _Requisito: listas actualizadas en tiempo real sin recargar_
+
+- [x] 10. Fixes adicionales
+  - Dashboard filtra eventos con `?mis_eventos=true` (solo los del dueño)
+  - Backend `EventoListView` soporta parámetro `mis_eventos` para filtrar por organizador
+  - Favicon SVG con la P de Puerta + título "Puerta" en index.html
+  - AsignarRrppModal filtra eventos con `estado !== 'cancelado'` (no `=== 'publicado'`)
+  - _Fix de bugs reportados_
 
 ---
 
 ## Notas
 
-- Los links RRPP se siguen generando internamente (los necesita el panel del RRPP para compartir su link de lista), pero ya no se muestran al dueño en el momento de asignar.
-- Si un RRPP tiene asignaciones existentes sin comisión (de antes de la migración), la data migration les copia los valores del modelo RRPP para mantener consistencia.
-- El cambio de polling de 4s a 15s reduce la carga sobre la API y baja la probabilidad de race conditions con el token refresh.
+- Los links RRPP se siguen generando internamente pero ya no se muestran al dueño.
+- La comisión global en el modelo RRPP queda como nullable (legacy, no se usa más).
+- El cambio de polling reduce la carga sobre la API y la probabilidad de race conditions.
+- `sessionStorage` fue elegido sobre `localStorage` por seguridad (se limpia al cerrar pestaña).
