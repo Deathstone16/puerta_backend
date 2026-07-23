@@ -8,11 +8,13 @@ from .views import (
     EliminarInvitadoView,
     MiPanelView,
     RechazarInvitadoView,
+    RRPPDetailView,
     RRPPListCreateView,
 )
 
 urlpatterns = [
     path('', RRPPListCreateView.as_view(), name='rrpp-list-create'),
+    path('<int:pk>/', RRPPDetailView.as_view(), name='rrpp-detail'),
     path('<int:pk>/asignar-evento/', AsignarEventoView.as_view(), name='rrpp-asignar-evento'),
     path('mi-panel/', MiPanelView.as_view(), name='rrpp-mi-panel'),
     path('anotar-invitado/', AnotarInvitadoView.as_view(), name='rrpp-anotar-invitado'),

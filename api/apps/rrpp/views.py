@@ -370,3 +370,64 @@ class EditarInvitadoView(APIView):
             'estado': asistente.estado,
             'mensaje': 'Invitado actualizado.',
         })
+
+
+class RRPPDetailView(APIView):
+    """
+    PATCH /api/rrpp/:id/ — Editar comisión de un RRPP.
+    DELETE /api/rrpp/:id/ — Eliminar RRPP (desactiva usuario).
+    """
+
+    permission_classes = [IsDueno]
+
+    def patch(self, request, pk):
+        rrpp = get_object_or_404(RRPP, pk=pk)
+
+        if rrpp.organizador != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Campos editables
+        tipo_comision = request.data.get('tipo_comision')
+        valor_comision = request.data.get('valor_comision')
+        nombre = request.data.get('nombre')
+        apellido = request.data.get('apellido')
+        telefono = request.data.get('telefono')
+
+        if tipo_comision is not None:
+            rrpp.tipo_comision = tipo_comision
+        if valor_comision is not None:
+            rrpp.valor_comision = valor_comision
+
+        rrpp.save()
+
+        # Actualizar datos del usuario asociado
+        usuario = rrpp.usuario
+        changed = False
+        if nombre is not None:
+            usuario.first_name = nombre.strip()
+            changed = True
+        if apellido is not None:
+            usuario.last_name = apellido.strip()
+            changed = True
+        if telefono is not None:
+            usuario.telefono = telefono.strip()
+            changed = True
+        if changed:
+            usuario.save()
+
+        return Response(RRPPSerializer(rrpp).data)
+
+    def delete(self, request, pk):
+        rrpp = get_object_or_404(RRPP, pk=pk)
+
+        if rrpp.organizador != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Desactivar el usuario (no eliminamos para mantener historial)
+        rrpp.usuario.is_active = False
+        rrpp.usuario.save(update_fields=['is_active'])
+
+        # Desactivar asignaciones
+        rrpp.asignaciones.update(activa=False)
+
+        return Response({'mensaje': 'RRPP eliminado correctamente.'})
