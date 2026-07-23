@@ -88,13 +88,6 @@ class MPConnectView(APIView):
     permission_classes = [IsDueno]
 
     def get(self, request):
-        # Verificar que el dueño tiene un boliche
-        if not Boliche.objects.filter(dueno=request.user).exists():
-            return Response(
-                {'error': 'Primero debés crear un boliche.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         params = urlencode({
             'client_id': settings.MP_APP_ID,
             'response_type': 'code',
@@ -134,12 +127,18 @@ class MPCallbackView(APIView):
             # Redirigir al frontend con error
             return redirect(f"{settings.FRONTEND_URL}/dashboard?mp_error=true")
 
-        # Buscar el boliche del dueño
+        # Buscar o crear el boliche del dueño
         try:
             from apps.cuentas.models import Usuario
             dueno = Usuario.objects.get(pk=int(state))
-            boliche = Boliche.objects.get(dueno=dueno)
-        except (Usuario.DoesNotExist, Boliche.DoesNotExist, ValueError):
+            boliche, _created = Boliche.objects.get_or_create(
+                dueno=dueno,
+                defaults={
+                    'nombre': dueno.get_full_name() or dueno.username,
+                    'direccion': '',
+                },
+            )
+        except (Usuario.DoesNotExist, ValueError):
             return redirect(f"{settings.FRONTEND_URL}/dashboard?mp_error=true")
 
         # Guardar tokens en el boliche
