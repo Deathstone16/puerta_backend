@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.boliches.models import Boliche
-from apps.cuentas.models import Usuario
+from apps.cuentas.models import AsignacionStaff, Usuario
 from apps.eventos.models import Evento
 from apps.rrpp.models import AsignacionRRPP, LinkRRPP, RRPP
 
@@ -43,14 +43,16 @@ def _setup_evento():
         nombre='Club', direccion='Dir', dueno=dueno,
     )
     evento = Evento.objects.create(
-        boliche=boliche, nombre='Noche', fecha=timezone.now() + timedelta(days=3),
+        boliche=boliche, organizador=dueno,
+        nombre='Noche', fecha=timezone.now() + timedelta(days=3),
         aforo_max=100, color_pulsera='violeta', precio_base=Decimal('5000'),
     )
     guardia = _crear_usuario('guardia_p', 'guardia')
     cajera = _crear_usuario('cajera_p', 'cajera')
     rrpp_user = _crear_usuario('rrpp_p', 'rrpp', first_name='Juan', last_name='P')
     rrpp = RRPP.objects.create(
-        usuario=rrpp_user, boliche=boliche, tipo_comision='fijo', valor_comision=500,
+        usuario=rrpp_user, boliche=boliche, organizador=dueno,
+        tipo_comision='fijo', valor_comision=500,
     )
     asignacion = AsignacionRRPP.objects.create(rrpp=rrpp, evento=evento)
     link_lista = asignacion.links.get(tipo='lista')
@@ -400,3 +402,82 @@ class FlujoCompletoTests(TestCase):
         # 5. Aforo sube
         resp = client_g.get(f'/api/dashboard/aforo/{evento.pk}/')
         self.assertEqual(resp.data['ingresados'], 1)
+
+
+class CajeraEscanearBuscarTests(TestCase):
+    """Área 2: endpoints escanear-qr / buscar-dni y defaults de cobrar-lista."""
+
+    def setUp(self):
+        self.evento, self.guardia, self.cajera, self.link = _setup_evento()
+        # La cajera debe estar asignada al evento (así lo resuelve el backend).
+        AsignacionStaff.objects.create(
+            usuario=self.cajera, evento=self.evento, rol='cajera', activa=True,
+        )
+        self.client_c = _auth_client(self.cajera)
+
+    def _crear_asistente_lista(self, dni='30111222', estado='aprobado_guardia'):
+        return Asistente.objects.create(
+            evento=self.evento, link_rrpp=self.link,
+            nombre='Ana', apellido='Gómez', dni=dni,
+            tipo_ingreso='lista_rrpp', estado=estado,
+        )
+
+    def test_buscar_dni_encuentra_en_evento_de_la_cajera(self):
+        self._crear_asistente_lista(dni='30111222')
+        resp = self.client_c.get('/api/puerta/cajera/buscar-dni/30111222/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['dni'], '30111222')
+        self.assertEqual(resp.data['tipo_ingreso'], 'lista_rrpp')
+        # monto_pago = precio_base del evento (5000)
+        self.assertEqual(float(resp.data['monto_pago']), 5000.0)
+
+    def test_buscar_dni_inexistente_da_404(self):
+        resp = self.client_c.get('/api/puerta/cajera/buscar-dni/00000000/')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_buscar_dni_sin_asignacion_da_400(self):
+        otra = _crear_usuario('cajera_sin', 'cajera')
+        resp = _auth_client(otra).get('/api/puerta/cajera/buscar-dni/30111222/')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_escanear_qr_lista_devuelve_datos_para_cobrar(self):
+        a = self._crear_asistente_lista(dni='30111333')
+        resp = self.client_c.post(
+            '/api/puerta/cajera/escanear-qr/',
+            {'qr_code': str(a.wallet_token)}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['id'], a.id)
+        self.assertEqual(resp.data['tipo_ingreso'], 'lista_rrpp')
+
+    def test_escanear_qr_web_marca_ingreso(self):
+        a = Asistente.objects.create(
+            evento=self.evento, nombre='Web', apellido='User', dni='30111444',
+            tipo_ingreso='web_anticipada', estado='aprobado_guardia',
+        )
+        resp = self.client_c.post(
+            '/api/puerta/cajera/escanear-qr/',
+            {'qr_code': str(a.wallet_token)}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        a.refresh_from_db()
+        self.assertEqual(a.estado, 'ingresado_final')
+
+    def test_escanear_qr_desconocido_da_404(self):
+        import uuid
+        resp = self.client_c.post(
+            '/api/puerta/cajera/escanear-qr/',
+            {'qr_code': str(uuid.uuid4())}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cobrar_lista_usa_defaults_sin_monto_ni_metodo(self):
+        a = self._crear_asistente_lista(dni='30111555')
+        resp = self.client_c.post(
+            f'/api/puerta/cajera/cobrar-lista/{a.id}/', {}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        a.refresh_from_db()
+        self.assertEqual(a.estado, 'ingresado_final')
+        self.assertEqual(a.metodo_pago, 'efectivo')
+        self.assertEqual(float(a.monto_pagado), 5000.0)
