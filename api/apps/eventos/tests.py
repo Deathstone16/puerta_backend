@@ -50,6 +50,8 @@ def _crear_evento(boliche, **kwargs):
         'line_up': [{'artista': 'DJ Test', 'horario': '00:00'}],
     }
     defaults.update(kwargs)
+    # `organizador` es obligatorio; por defecto usamos el dueño del boliche.
+    defaults.setdefault('organizador', boliche.dueno)
     return Evento.objects.create(boliche=boliche, **defaults)
 
 
@@ -133,10 +135,14 @@ class EventoListTests(TestCase):
         resp = self.client.get('/api/eventos/')
         self.assertIn('precio_publicado', resp.data[0])
 
-    def test_listado_incluye_boliche_anidado(self):
+    def test_listado_incluye_campos_derivados(self):
+        # Área 1: el serializer expone info del boliche/evento como campos planos
+        # (club, ciudad, slug, fechaCorta, horario, lineup) en vez de un objeto anidado.
         resp = self.client.get('/api/eventos/')
-        self.assertIn('boliche', resp.data[0])
-        self.assertIn('nombre', resp.data[0]['boliche'])
+        item = resp.data[0]
+        for campo in ('slug', 'club', 'ciudad', 'genero', 'imagen', 'fechaCorta', 'horario', 'lineup'):
+            self.assertIn(campo, item)
+        self.assertEqual(item['slug'], str(item['id']))
 
 
 # ─── Tests del detalle ───────────────────────────────────────────────────────
