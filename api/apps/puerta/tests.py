@@ -481,3 +481,29 @@ class CajeraEscanearBuscarTests(TestCase):
         self.assertEqual(a.estado, 'ingresado_final')
         self.assertEqual(a.metodo_pago, 'efectivo')
         self.assertEqual(float(a.monto_pagado), 5000.0)
+
+
+class ListaAnotarDniValidacionTests(TestCase):
+    """REQ-7.3: validación de DNI (7-8 dígitos) al anotar en lista pública."""
+
+    def setUp(self):
+        self.evento, _, _, self.link = _setup_evento()
+        self.client = APIClient()
+
+    def test_dni_invalido_da_400(self):
+        resp = self.client.post(f'/api/lista/{self.link.slug}/anotar/', {
+            'nombre': 'X', 'apellido': 'Y', 'dni': 'no-es-dni',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_dni_muy_corto_da_400(self):
+        resp = self.client.post(f'/api/lista/{self.link.slug}/anotar/', {
+            'nombre': 'X', 'apellido': 'Y', 'dni': '123',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_dni_valido_ok(self):
+        resp = self.client.post(f'/api/lista/{self.link.slug}/anotar/', {
+            'nombre': 'X', 'apellido': 'Y', 'dni': '40555666',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)

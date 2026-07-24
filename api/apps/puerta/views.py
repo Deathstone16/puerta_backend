@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
@@ -82,6 +83,13 @@ class ListaAnotarView(EventoActivoMixin, APIView):
         if not all([nombre, apellido, dni]):
             return Response(
                 {'error': 'Los campos nombre, apellido y dni son obligatorios.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # REQ-7.3: validar DNI (7 u 8 dígitos) también en el backend.
+        if not re.fullmatch(r'\d{7,8}', dni):
+            return Response(
+                {'error': 'El DNI debe tener 7 u 8 dígitos, sin puntos.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
