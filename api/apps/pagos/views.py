@@ -269,39 +269,71 @@ class RecaudacionView(APIView):
         if evento.organizador != request.user:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
-        qs = Asistente.objects.filter(evento=evento, estado='ingresado_final')
+        return Response(_build_recaudacion(evento))
 
-        web = qs.filter(tipo_ingreso='web_anticipada').aggregate(
-            monto=Sum('monto_pagado'), cantidad=Count('id'),
-            comision_norware=Sum('mp_fee_norware'),
-        )
-        efectivo = qs.filter(metodo_pago='efectivo').aggregate(
-            monto=Sum('monto_pagado'), cantidad=Count('id'),
-        )
-        transferencia = qs.filter(metodo_pago='transferencia').aggregate(
-            monto=Sum('monto_pagado'), cantidad=Count('id'),
-        )
 
-        total = (web['monto'] or 0) + (efectivo['monto'] or 0) + (transferencia['monto'] or 0)
+class RecaudacionCajeraView(APIView):
+    """GET /api/cajera/cierre/ — Cierre de caja para la cajera (su evento asignado)."""
 
-        return Response({
-            'evento_id': evento_id,
-            'web': {
-                'cantidad': web['cantidad'] or 0,
-                'monto_bruto': float(web['monto'] or 0),
-                'comision_norware': float(web['comision_norware'] or 0),
-            },
-            'efectivo': {
-                'cantidad': efectivo['cantidad'] or 0,
-                'monto': float(efectivo['monto'] or 0),
-            },
-            'transferencia': {
-                'cantidad': transferencia['cantidad'] or 0,
-                'monto': float(transferencia['monto'] or 0),
-            },
-            'total_recaudado': float(total),
-            'comision_norware_web': float(web['comision_norware'] or 0),
-        })
+    from rest_framework.permissions import IsAuthenticated
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.cuentas.models import AsignacionStaff
+
+        if request.user.rol != 'cajera':
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # Find the cajera's active assignment
+        asignacion = AsignacionStaff.objects.filter(
+            usuario=request.user, activa=True, rol='cajera',
+        ).select_related('evento').first()
+
+        if not asignacion:
+            return Response(
+                {'error': 'No tenés un evento asignado activo.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(_build_recaudacion(asignacion.evento))
+
+
+def _build_recaudacion(evento):
+    """Shared helper: builds recaudación response for a given evento."""
+    qs = Asistente.objects.filter(evento=evento, estado='ingresado_final')
+
+    web = qs.filter(tipo_ingreso='web_anticipada').aggregate(
+        monto=Sum('monto_pagado'), cantidad=Count('id'),
+        comision_norware=Sum('mp_fee_norware'),
+    )
+    efectivo = qs.filter(metodo_pago='efectivo').aggregate(
+        monto=Sum('monto_pagado'), cantidad=Count('id'),
+    )
+    transferencia = qs.filter(metodo_pago='transferencia').aggregate(
+        monto=Sum('monto_pagado'), cantidad=Count('id'),
+    )
+
+    total = (web['monto'] or 0) + (efectivo['monto'] or 0) + (transferencia['monto'] or 0)
+
+    return {
+        'evento_id': evento.id,
+        'evento_nombre': evento.nombre,
+        'web': {
+            'cantidad': web['cantidad'] or 0,
+            'monto_bruto': float(web['monto'] or 0),
+            'comision_norware': float(web['comision_norware'] or 0),
+        },
+        'efectivo': {
+            'cantidad': efectivo['cantidad'] or 0,
+            'monto': float(efectivo['monto'] or 0),
+        },
+        'transferencia': {
+            'cantidad': transferencia['cantidad'] or 0,
+            'monto': float(transferencia['monto'] or 0),
+        },
+        'total_recaudado': float(total),
+        'comision_norware_web': float(web['comision_norware'] or 0),
+    }
 
 
 # ─── Dashboard Ranking RRPP ──────────────────────────────────────────────────

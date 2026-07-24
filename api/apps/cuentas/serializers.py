@@ -24,7 +24,32 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         nombre = f"{self.user.first_name} {self.user.last_name}".strip()
         data['nombre'] = nombre if nombre else self.user.username
         data['id'] = self.user.id
+
+        # For staff roles (guardia, cajera), include their active event assignment
+        if self.user.rol in ('guardia', 'cajera'):
+            data['evento'] = self._get_staff_evento()
+            data['evento_id'] = data['evento']['id'] if data['evento'] else None
+
         return data
+
+    def _get_staff_evento(self):
+        """Resolve the active event assignment for guardia/cajera."""
+        from apps.cuentas.models import AsignacionStaff
+
+        asignacion = AsignacionStaff.objects.filter(
+            usuario=self.user, activa=True,
+        ).select_related('evento').first()
+
+        if not asignacion:
+            return None
+
+        evento = asignacion.evento
+        return {
+            'id': evento.id,
+            'nombre': evento.nombre,
+            'fecha': str(evento.fecha) if evento.fecha else None,
+            'precio_publicado': float(evento.precio_base) if hasattr(evento, 'precio_base') else 0,
+        }
 
 
 class OrganizadorListSerializer(serializers.ModelSerializer):

@@ -24,11 +24,14 @@ guardia_urlpatterns = [
     path('rebotar/<int:pk>/', GuardiaRebotarView.as_view(), name='guardia-rebotar'),
 ]
 
+from apps.pagos.views import RecaudacionCajeraView
+
 cajera_urlpatterns = [
     path('escanear-web/<int:pk>/', CajeraEscanearWebView.as_view(), name='cajera-escanear-web'),
     path('cobrar-lista/<int:pk>/', CajeraCobrarListaView.as_view(), name='cajera-cobrar-lista'),
     path('venta-general/', CajeraVentaGeneralView.as_view(), name='cajera-venta-general'),
     path('deshacer/<int:pk>/', CajeraDeshacerView.as_view(), name='cajera-deshacer'),
+    path('cierre/', RecaudacionCajeraView.as_view(), name='cajera-cierre'),
 ]
 
 dashboard_urlpatterns = [
