@@ -43,7 +43,8 @@ def _setup():
         mp_access_token='TEST-seller-token', mp_user_id='12345',
     )
     evento = Evento.objects.create(
-        boliche=boliche, nombre='Noche', fecha=timezone.now() + timezone.timedelta(days=3),
+        boliche=boliche, organizador=dueno,
+        nombre='Noche', fecha=timezone.now() + timezone.timedelta(days=3),
         aforo_max=500, color_pulsera='violeta', precio_base=Decimal('5000'),
     )
     return dueno, boliche, evento

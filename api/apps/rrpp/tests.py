@@ -51,13 +51,14 @@ def _crear_evento(boliche, **kwargs):
         'precio_base': Decimal('5000.00'),
     }
     defaults.update(kwargs)
+    defaults.setdefault('organizador', boliche.dueno)
     return Evento.objects.create(boliche=boliche, **defaults)
 
 
 def _crear_rrpp(boliche, username='rrpp1'):
     user = _crear_usuario(username, 'rrpp', first_name='Juan', last_name='Pérez')
     return RRPP.objects.create(
-        usuario=user, boliche=boliche,
+        usuario=user, boliche=boliche, organizador=boliche.dueno,
         tipo_comision='fijo', valor_comision=Decimal('500.00'),
     )
 
