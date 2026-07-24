@@ -239,7 +239,9 @@ class PersonalAsignarEventoView(APIView):
         if user is None:
             return Response(status=status.HTTP_403_FORBIDDEN)
 
-        evento_id = request.data.get('evento_id')
+        # REQ-8.2: el evento se recibe por query param (?evento_id=). Un DELETE con
+        # body no es confiable entre clientes. Se acepta el body como fallback.
+        evento_id = request.query_params.get('evento_id') or request.data.get('evento_id')
         if not evento_id:
             return Response(
                 {'error': 'El campo evento_id es obligatorio.'},

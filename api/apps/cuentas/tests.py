@@ -355,3 +355,50 @@ class FixtureTests(TestCase):
                 u.check_password(password),
                 f"Contraseña inválida para {username}"
             )
+
+
+# ─── Test desasignar por query param (REQ-8.2) ───────────────────────────────
+
+class DesasignarEventoQueryParamTests(TestCase):
+    """DELETE /api/personal/:id/asignar-evento/?evento_id= — desasignar RRPP."""
+
+    def setUp(self):
+        from apps.boliches.models import Boliche
+        from apps.eventos.models import Evento
+        from apps.rrpp.models import AsignacionRRPP, RRPP
+        from django.utils import timezone as tz
+        from datetime import timedelta as td
+        from decimal import Decimal
+
+        self.dueno = Usuario.objects.create_user('dueno_ds', 'x', rol='dueno')
+        boliche = Boliche.objects.create(nombre='C', direccion='D', dueno=self.dueno)
+        self.evento = Evento.objects.create(
+            boliche=boliche, organizador=self.dueno, nombre='N',
+            fecha=tz.now() + td(days=2), aforo_max=100,
+            color_pulsera='violeta', precio_base=Decimal('5000'),
+        )
+        self.rrpp_user = Usuario.objects.create_user(
+            'rrpp_ds', 'x', rol='rrpp', organizador=self.dueno,
+        )
+        self.rrpp = RRPP.objects.create(
+            usuario=self.rrpp_user, organizador=self.dueno,
+            tipo_comision='fijo', valor_comision=Decimal('500'),
+        )
+        self.asignacion = AsignacionRRPP.objects.create(
+            rrpp=self.rrpp, evento=self.evento,
+            tipo_comision='fijo', valor_comision=Decimal('500'),
+        )
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {AccessToken.for_user(self.dueno)}')
+
+    def test_desasignar_por_query_param(self):
+        resp = self.client.delete(
+            f'/api/personal/{self.rrpp_user.pk}/asignar-evento/?evento_id={self.evento.pk}'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.asignacion.refresh_from_db()
+        self.assertFalse(self.asignacion.activa)
+
+    def test_desasignar_sin_evento_id_da_400(self):
+        resp = self.client.delete(f'/api/personal/{self.rrpp_user.pk}/asignar-evento/')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
