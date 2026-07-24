@@ -276,13 +276,17 @@ class AprobarInvitadoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # "Aprobado por RRPP" = queda en la lista visible para el guardia
-        # El estado sigue siendo 'pendiente' para el flujo de puerta (guardia aprueba/rebota)
-        # Marcamos con un campo que el RRPP ya lo validó — no cambiamos estado
-        # Para el MVP: simplemente confirmamos que queda en lista
+        # REQ-3.1: la aprobación del RRPP ahora PERSISTE (deja de ser cosmética).
+        # El invitado queda 'aprobado_guardia', que es el estado que habilita a la
+        # cajera a cobrarlo y que el guardia ve como validado.
+        from django.utils import timezone
+        asistente.estado = 'aprobado_guardia'
+        asistente.aprobado_at = timezone.now()
+        asistente.save(update_fields=['estado', 'aprobado_at'])
+
         return Response({
             'id': asistente.id,
-            'estado': 'aprobado',
+            'estado': asistente.estado,
             'mensaje': 'Invitado aprobado. Aparece en la lista del guardia.',
         })
 

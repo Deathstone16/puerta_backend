@@ -89,9 +89,11 @@ class AltaRRPPTests(TestCase):
         # Verificar que se creó usuario con rol rrpp
         user = Usuario.objects.get(username='nuevo_rrpp')
         self.assertEqual(user.rol, 'rrpp')
-        # Verificar perfil RRPP
+        # Verificar perfil RRPP (modelo standalone: ligado al organizador, no al boliche)
         self.assertTrue(hasattr(user, 'perfil_rrpp'))
-        self.assertEqual(user.perfil_rrpp.boliche, self.boliche)
+        self.assertEqual(user.perfil_rrpp.organizador, self.dueno)
+        # REQ-8.1: el usuario también queda ligado al organizador
+        self.assertEqual(user.organizador, self.dueno)
 
     def test_alta_rrpp_username_duplicado_revierte_transaction(self):
         _crear_usuario('existente', 'rrpp')
@@ -178,25 +180,27 @@ class AsignarEventoTests(TestCase):
         self.evento = _crear_evento(self.boliche)
         self.client = _auth_client(self.dueno)
 
-    def test_asignar_evento_genera_2_links_en_respuesta(self):
+    def test_asignar_evento_genera_2_links(self):
         resp = self.client.post(
             f'/api/rrpp/{self.rrpp.pk}/asignar-evento/',
-            {'evento_id': self.evento.pk},
+            {'evento_id': self.evento.pk, 'tipo_comision': 'fijo', 'valor_comision': 500},
             format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(len(resp.data['links']), 2)
-        tipos = {l['tipo'] for l in resp.data['links']}
-        self.assertEqual(tipos, {'lista', 'venta_web'})
+        asignacion = AsignacionRRPP.objects.get(pk=resp.data['asignacion_id'])
+        links = list(asignacion.links.all())
+        self.assertEqual(len(links), 2)
+        self.assertEqual({l.tipo for l in links}, {'lista', 'venta_web'})
 
     def test_asignar_evento_links_tienen_slugs_distintos(self):
         resp = self.client.post(
             f'/api/rrpp/{self.rrpp.pk}/asignar-evento/',
-            {'evento_id': self.evento.pk},
+            {'evento_id': self.evento.pk, 'tipo_comision': 'fijo', 'valor_comision': 500},
             format='json',
         )
-        slugs = [l['slug'] for l in resp.data['links']]
-        self.assertNotEqual(slugs[0], slugs[1])
+        asignacion = AsignacionRRPP.objects.get(pk=resp.data['asignacion_id'])
+        slugs = [str(l.slug) for l in asignacion.links.all()]
+        self.assertEqual(len(set(slugs)), 2)
 
     def test_asignar_evento_ajeno_al_boliche_devuelve_400(self):
         otro_dueno = _crear_usuario('otro3', 'dueno')
@@ -211,18 +215,21 @@ class AsignarEventoTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_asignar_evento_duplicado_devuelve_409(self):
+    def test_asignar_evento_duplicado_es_idempotente(self):
+        # Asignar dos veces el mismo RRPP a un evento no crea un duplicado:
+        # la segunda vez devuelve 200 con ya_asignado=True (previene el duplicado).
+        payload = {'evento_id': self.evento.pk, 'tipo_comision': 'fijo', 'valor_comision': 500}
         self.client.post(
-            f'/api/rrpp/{self.rrpp.pk}/asignar-evento/',
-            {'evento_id': self.evento.pk},
-            format='json',
+            f'/api/rrpp/{self.rrpp.pk}/asignar-evento/', payload, format='json',
         )
         resp = self.client.post(
-            f'/api/rrpp/{self.rrpp.pk}/asignar-evento/',
-            {'evento_id': self.evento.pk},
-            format='json',
+            f'/api/rrpp/{self.rrpp.pk}/asignar-evento/', payload, format='json',
         )
-        self.assertEqual(resp.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data.get('ya_asignado'))
+        self.assertEqual(
+            AsignacionRRPP.objects.filter(rrpp=self.rrpp, evento=self.evento).count(), 1,
+        )
 
     def test_asignar_sin_auth_devuelve_401(self):
         client = APIClient()
@@ -272,3 +279,57 @@ class MiPanelTests(TestCase):
         client = _auth_client(self.dueno)
         resp = client.get('/api/rrpp/mi-panel/')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+# ─── Tests de aprobación de invitados (Área 3) ───────────────────────────────
+
+class AprobarInvitadoTests(TestCase):
+
+    def setUp(self):
+        self.dueno = _crear_usuario('dueno_ap', 'dueno')
+        self.boliche = _crear_boliche(self.dueno)
+        self.rrpp = _crear_rrpp(self.boliche, username='rrpp_ap')
+        self.evento = _crear_evento(self.boliche)
+        self.asignacion = AsignacionRRPP.objects.create(rrpp=self.rrpp, evento=self.evento)
+        self.link = self.asignacion.links.get(tipo='lista')
+        self.client = _auth_client(self.rrpp.usuario)
+
+    def _crear_invitado(self, dni='40111222'):
+        from apps.puerta.models import Asistente
+        return Asistente.objects.create(
+            evento=self.evento, link_rrpp=self.link,
+            nombre='Inv', apellido='Itado', dni=dni,
+            tipo_ingreso='lista_rrpp', estado='pendiente',
+        )
+
+    def test_aprobar_invitado_persiste_estado(self):
+        # REQ-3.1: aprobar deja de ser cosmético — persiste 'aprobado_guardia'.
+        inv = self._crear_invitado()
+        resp = self.client.post(f'/api/rrpp/aprobar-invitado/{inv.pk}/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        inv.refresh_from_db()
+        self.assertEqual(inv.estado, 'aprobado_guardia')
+        self.assertIsNotNone(inv.aprobado_at)
+
+    def test_aprobar_invitado_ajeno_da_403(self):
+        from apps.puerta.models import Asistente
+        otro_rrpp = _crear_rrpp(self.boliche, username='rrpp_otro_ap')
+        otra_asig = AsignacionRRPP.objects.create(rrpp=otro_rrpp, evento=self.evento)
+        otro_link = otra_asig.links.get(tipo='lista')
+        inv = Asistente.objects.create(
+            evento=self.evento, link_rrpp=otro_link,
+            nombre='X', apellido='Y', dni='40999888',
+            tipo_ingreso='lista_rrpp', estado='pendiente',
+        )
+        resp = self.client.post(f'/api/rrpp/aprobar-invitado/{inv.pk}/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_mi_panel_incluye_link_personal_y_slug(self):
+        # REQ-3.2: el panel expone link_personal (URL de lista) y slug directo.
+        resp = self.client.get('/api/rrpp/mi-panel/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        item = resp.data[0]
+        self.assertIn('link_personal', item)
+        self.assertIn('slug', item)
+        self.assertTrue(item['link_personal'].startswith('/lista/'))
+        self.assertIn(item['slug'], item['link_personal'])
