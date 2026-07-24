@@ -2,8 +2,10 @@ from django.urls import path
 
 from .views import (
     AforoView,
+    CajeraBuscarDniView,
     CajeraCobrarListaView,
     CajeraDeshacerView,
+    CajeraEscanearQrView,
     CajeraEscanearWebView,
     CajeraVentaGeneralView,
     GuardiaAprobarView,
@@ -27,6 +29,8 @@ guardia_urlpatterns = [
 from apps.pagos.views import RecaudacionCajeraView
 
 cajera_urlpatterns = [
+    path('escanear-qr/', CajeraEscanearQrView.as_view(), name='cajera-escanear-qr'),
+    path('buscar-dni/<str:dni>/', CajeraBuscarDniView.as_view(), name='cajera-buscar-dni'),
     path('escanear-web/<int:pk>/', CajeraEscanearWebView.as_view(), name='cajera-escanear-web'),
     path('cobrar-lista/<int:pk>/', CajeraCobrarListaView.as_view(), name='cajera-cobrar-lista'),
     path('venta-general/', CajeraVentaGeneralView.as_view(), name='cajera-venta-general'),

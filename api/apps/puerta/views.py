@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -248,6 +249,112 @@ def _validar_aprobado_guardia(asistente):
     return None
 
 
+def _evento_activo_cajera(request):
+    """Resuelve el evento asignado ACTIVO de la cajera autenticada.
+
+    Devuelve (evento, None) o (None, Response de error). La cajera nunca opera
+    sobre un evento que no sea el suyo: el evento sale de su AsignacionStaff,
+    nunca de un id enviado por el cliente.
+    """
+    from apps.cuentas.models import AsignacionStaff
+    asignacion = AsignacionStaff.objects.filter(
+        usuario=request.user, activa=True, rol='cajera',
+    ).select_related('evento').first()
+    if not asignacion:
+        return None, Response(
+            {'error': 'No tenés un evento asignado activo.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return asignacion.evento, None
+
+
+def _persona_para_cajera(asistente):
+    """Forma que espera el frontend de la cajera para el resultado de identificación."""
+    tipo = 'entrada_web' if asistente.tipo_ingreso == 'web_anticipada' else asistente.tipo_ingreso
+    rrpp_nombre = None
+    if asistente.link_rrpp_id:
+        rrpp_user = asistente.link_rrpp.asignacion.rrpp.usuario
+        rrpp_nombre = rrpp_user.get_full_name() or rrpp_user.username
+    precio = asistente.evento.precio_base
+    return {
+        'id': asistente.id,
+        'nombre': asistente.nombre,
+        'apellido': asistente.apellido,
+        'dni': asistente.dni,
+        'estado': asistente.estado,
+        'tipo_ingreso': tipo,
+        'rrpp_nombre': rrpp_nombre,
+        'monto_pago': float(precio) if precio is not None else None,
+    }
+
+
+class CajeraEscanearQrView(EventoActivoMixin, APIView):
+    """POST /api/puerta/cajera/escanear-qr/ — Identifica un QR (wallet_token) en el evento de la cajera.
+
+    Si el ticket es web anticipada, marca el ingreso final. Si es de lista, devuelve
+    los datos para que la cajera lo cobre.
+    """
+
+    permission_classes = [IsCajera]
+
+    def post(self, request):
+        qr_code = request.data.get('qr_code')
+        if not qr_code:
+            return Response(
+                {'error': 'El campo qr_code es obligatorio.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        evento, err = _evento_activo_cajera(request)
+        if err:
+            return err
+        bloqueo = self.verificar_evento_activo(evento)
+        if bloqueo:
+            return bloqueo
+
+        try:
+            asistente = Asistente.objects.select_related(
+                'evento', 'link_rrpp__asignacion__rrpp__usuario',
+            ).get(wallet_token=qr_code, evento=evento)
+        except (Asistente.DoesNotExist, ValueError, ValidationError):
+            return Response(
+                {'error': 'QR no encontrado para este evento.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if asistente.tipo_ingreso == 'web_anticipada':
+            error = _validar_aprobado_guardia(asistente)
+            if error:
+                return error
+            asistente.estado = 'ingresado_final'
+            asistente.metodo_pago = 'ya_pago_web'
+            asistente.ingresado_at = timezone.now()
+            asistente.save(update_fields=['estado', 'metodo_pago', 'ingresado_at'])
+
+        return Response(_persona_para_cajera(asistente))
+
+
+class CajeraBuscarDniView(APIView):
+    """GET /api/puerta/cajera/buscar-dni/:dni/ — Busca un asistente por DNI en el evento de la cajera."""
+
+    permission_classes = [IsCajera]
+
+    def get(self, request, dni):
+        evento, err = _evento_activo_cajera(request)
+        if err:
+            return err
+
+        asistente = Asistente.objects.select_related(
+            'evento', 'link_rrpp__asignacion__rrpp__usuario',
+        ).filter(evento=evento, dni=str(dni)).first()
+        if not asistente:
+            return Response(
+                {'error': 'No se encontró una persona con ese DNI en el evento.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(_persona_para_cajera(asistente))
+
+
 class CajeraEscanearWebView(EventoActivoMixin, APIView):
     """POST /api/puerta/cajera/escanear-web/:id/ — Ingreso web anticipada."""
 
@@ -300,17 +407,16 @@ class CajeraCobrarListaView(EventoActivoMixin, APIView):
         if error:
             return error
 
-        metodo_pago = request.data.get('metodo_pago')
+        # REQ-2.3: si no llegan monto_pagado / metodo_pago, usar defaults
+        # (precio_base del evento y 'efectivo') en vez de rechazar la operación.
+        metodo_pago = request.data.get('metodo_pago') or 'efectivo'
         monto_pagado = request.data.get('monto_pagado')
+        if monto_pagado in (None, ''):
+            monto_pagado = asistente.evento.precio_base
 
         if metodo_pago not in ('efectivo', 'transferencia'):
             return Response(
                 {'error': 'metodo_pago debe ser "efectivo" o "transferencia".'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not monto_pagado:
-            return Response(
-                {'error': 'El campo monto_pagado es obligatorio.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
