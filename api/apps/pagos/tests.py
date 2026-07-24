@@ -157,6 +157,54 @@ class WebhookTests(TestCase):
         self.assertEqual(Asistente.objects.filter(mp_payment_id='PAY-DUP').count(), 1)
         mock_obtener.assert_not_called()
 
+    @patch('apps.pagos.mp_client.obtener_pago')
+    def test_webhook_dni_invalido_no_crea_asistente(self, mock_obtener):
+        # REQ-5.1/10.3: DNI inválido (ej. un email) NO debe crear asistente.
+        mock_obtener.return_value = {
+            'status': 'approved',
+            'metadata': {'evento_id': self.evento.pk, 'nombre': 'Test', 'apellido': 'User'},
+            'payer': {'email': 'no-es-un-dni@test.com', 'first_name': 'T', 'last_name': 'U'},
+            'transaction_amount': 5700,
+            'fee_details': [{'amount': 400}],
+        }
+        resp = self.client.post('/api/pagos/webhook/', {
+            'type': 'payment', 'data': {'id': 'PAY-BAD'},
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(Asistente.objects.filter(mp_payment_id='PAY-BAD').exists())
+
+    @patch('apps.pagos.mp_client.obtener_pago')
+    def test_webhook_sin_nombre_no_crea_asistente(self, mock_obtener):
+        # REQ-5.1: falta nombre/apellido -> no se crea.
+        mock_obtener.return_value = {
+            'status': 'approved',
+            'metadata': {'evento_id': self.evento.pk, 'dni': '40000009'},
+            'payer': {'email': 'x@test.com'},
+            'transaction_amount': 5700,
+            'fee_details': [{'amount': 400}],
+        }
+        resp = self.client.post('/api/pagos/webhook/', {
+            'type': 'payment', 'data': {'id': 'PAY-NONAME'},
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(Asistente.objects.filter(mp_payment_id='PAY-NONAME').exists())
+
+    @patch('apps.pagos.mp_client.obtener_pago')
+    def test_webhook_topic_por_query_param(self, mock_obtener):
+        # REQ-5.2: el topic 'payment' puede venir por query param.
+        mock_obtener.return_value = {
+            'status': 'approved',
+            'metadata': {'evento_id': self.evento.pk, 'dni': '40000010', 'nombre': 'Q', 'apellido': 'P'},
+            'payer': {'email': 'q@test.com'},
+            'transaction_amount': 5700,
+            'fee_details': [{'amount': 400}],
+        }
+        resp = self.client.post(
+            '/api/pagos/webhook/?topic=payment&id=PAY-QP', {}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(Asistente.objects.filter(mp_payment_id='PAY-QP').exists())
+
     def test_webhook_tipo_no_payment_ignorado(self):
         resp = self.client.post('/api/pagos/webhook/', {
             'type': 'merchant_order',

@@ -4,6 +4,7 @@ Vistas de la app pagos: preferencia MP, webhook, wallet y dashboards.
 import hashlib
 import hmac
 import logging
+import re
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -105,7 +106,14 @@ class WebhookView(APIView):
         # Siempre responder 200 para que MP no reintente
         try:
             data = request.data
-            topic = data.get('type') or request.query_params.get('topic', '')
+            # REQ-5.2: el topic puede venir en el body ('type'/'topic') o en la query.
+            topic = (
+                data.get('type')
+                or data.get('topic')
+                or request.query_params.get('topic')
+                or request.query_params.get('type')
+                or ''
+            )
 
             if topic != 'payment':
                 return Response({'ok': True})
@@ -129,12 +137,30 @@ class WebhookView(APIView):
             # Extraer datos del comprador
             metadata = pago.get('metadata', {})
             evento_id = metadata.get('evento_id')
-            dni = metadata.get('dni') or pago.get('payer', {}).get('email', '')
-            nombre = metadata.get('nombre') or pago.get('payer', {}).get('first_name', '')
-            apellido = metadata.get('apellido') or pago.get('payer', {}).get('last_name', '')
+            payer = pago.get('payer', {})
+            # REQ-5.1: el DNI sale de la metadata. NUNCA usar el email como DNI.
+            dni = str(metadata.get('dni') or '').strip()
+            nombre = str(metadata.get('nombre') or payer.get('first_name') or '').strip()
+            apellido = str(metadata.get('apellido') or payer.get('last_name') or '').strip()
 
             if not evento_id:
                 logger.warning("Webhook sin evento_id en metadata, payment_id=%s", payment_id)
+                return Response({'ok': True})
+
+            # REQ-5.1: validar DNI (7-8 dígitos) y nombre/apellido ANTES de crear.
+            # Si los datos no sirven, no creamos un asistente basura (respondemos 200
+            # igual para que MP no reintente, pero logueamos para diagnóstico).
+            if not re.fullmatch(r'\d{7,8}', dni):
+                logger.warning(
+                    "Webhook con DNI inválido (%r), payment_id=%s — no se crea asistente.",
+                    dni, payment_id,
+                )
+                return Response({'ok': True})
+            if not nombre or not apellido:
+                logger.warning(
+                    "Webhook sin nombre/apellido, payment_id=%s — no se crea asistente.",
+                    payment_id,
+                )
                 return Response({'ok': True})
 
             evento = Evento.objects.get(pk=evento_id)
