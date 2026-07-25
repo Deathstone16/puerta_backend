@@ -49,6 +49,7 @@ class Asistente(models.Model):
     mp_fee_norware = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
     )
+    aprobado_rrpp = models.BooleanField(default=False)
     motivo_rechazo = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -233,16 +233,16 @@ class AnotarInvitadoView(APIView):
                 dni=dni,
                 instagram=instagram,
                 tipo_ingreso='lista_rrpp',
-                estado='pendiente',  # Carga manual del RRPP = ya aprobado por él
+                estado='pendiente',
+                aprobado_rrpp=True,
             )
-            # Como lo carga el RRPP manualmente, lo dejamos directo en la lista
-            # (no necesita aprobación adicional del RRPP)
             return Response({
                 'id': asistente.id,
                 'nombre': f"{asistente.nombre} {asistente.apellido}",
                 'dni': asistente.dni,
                 'instagram': asistente.instagram,
                 'estado': 'pendiente',
+                'aprobado_rrpp': True,
             }, status=status.HTTP_201_CREATED)
         except ImportError:
             return Response(
@@ -276,17 +276,16 @@ class AprobarInvitadoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # REQ-3.1: la aprobación del RRPP ahora PERSISTE (deja de ser cosmética).
-        # El invitado queda 'aprobado_guardia', que es el estado que habilita a la
-        # cajera a cobrarlo y que el guardia ve como validado.
-        from django.utils import timezone
-        asistente.estado = 'aprobado_guardia'
-        asistente.aprobado_at = timezone.now()
-        asistente.save(update_fields=['estado', 'aprobado_at'])
+        # "Aprobado por RRPP" = queda en la lista visible para el guardia
+        # El estado sigue siendo 'pendiente' para el flujo de puerta (guardia aprueba/rebota)
+        # Marcamos con un campo booleano que el RRPP ya lo validó
+        asistente.aprobado_rrpp = True
+        asistente.save(update_fields=['aprobado_rrpp'])
 
         return Response({
             'id': asistente.id,
-            'estado': asistente.estado,
+            'estado': 'pendiente',
+            'aprobado_rrpp': True,
             'mensaje': 'Invitado aprobado. Aparece en la lista del guardia.',
         })
 

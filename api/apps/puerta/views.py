@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.cuentas.permissions import IsCajera, IsDueno, IsGuardia
 from apps.eventos.models import Evento
+from apps.eventos.utils import calcular_precio_publicado
 from apps.rrpp.models import LinkRRPP
 
 from .mixins import EventoActivoMixin
@@ -39,14 +40,22 @@ class ListaInfoView(APIView):
         anotados = Asistente.objects.filter(link_rrpp=link).count()
         rrpp_user = link.asignacion.rrpp.usuario
 
+        desglose = calcular_precio_publicado(evento.precio_base)
+
         return Response({
             'evento': {
                 'id': evento.id,
                 'nombre': evento.nombre,
                 'fecha': evento.fecha,
-                'boliche': evento.boliche.nombre,
+                'fecha_corta': evento.fecha.strftime('%a %d %b').upper() if evento.fecha else None,
+                'boliche': evento.boliche.nombre if evento.boliche else None,
+                'club': evento.boliche.nombre if evento.boliche else None,
+                'ciudad': evento.boliche.ciudad if evento.boliche and hasattr(evento.boliche, 'ciudad') else None,
+                'horario': evento.fecha.strftime('%H:%M') if evento.fecha else None,
                 'color_pulsera': evento.color_pulsera,
                 'habilitar_lista': evento.habilitar_lista,
+                'precio_publicado': desglose['precio_publicado'],
+                'imagen': None,
             },
             'rrpp_nombre': rrpp_user.get_full_name() or rrpp_user.username,
             'link_activo': True,
@@ -574,3 +583,74 @@ class AforoView(APIView):
             'porcentaje': porcentaje,
             'pendientes': pendientes,
         })
+
+
+# ─── Cajera — Escanear + Buscar ───────────────────────────────────────────────
+
+def _asistente_response(asistente):
+    rrpp_nombre = None
+    if asistente.link_rrpp:
+        rrpp_nombre = asistente.link_rrpp.asignacion.rrpp.usuario.get_full_name() or \
+                       asistente.link_rrpp.asignacion.rrpp.usuario.username
+    desglose = calcular_precio_publicado(asistente.evento.precio_base)
+    return {
+        'id': asistente.id,
+        'nombre': asistente.nombre,
+        'apellido': asistente.apellido,
+        'dni': asistente.dni,
+        'estado': asistente.estado,
+        'tipo_ingreso': asistente.tipo_ingreso,
+        'rrpp_nombre': rrpp_nombre,
+        'monto_pago': desglose['precio_publicado'] if asistente.tipo_ingreso == 'lista_rrpp' else None,
+    }
+
+
+class CajeraEscanearQRView(EventoActivoMixin, APIView):
+    permission_classes = [IsCajera]
+
+    def post(self, request):
+        qr_code = request.data.get('qr_code')
+        if not qr_code:
+            return Response({'error': 'El campo qr_code es obligatorio.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.cuentas.models import AsignacionStaff
+        asignacion = AsignacionStaff.objects.filter(usuario=request.user, activa=True).first()
+        if not asignacion:
+            return Response({'error': 'No tenés un evento asignado activo.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            asistente = Asistente.objects.select_related('evento', 'link_rrpp').get(
+                wallet_token=qr_code, evento=asignacion.evento,
+            )
+        except Asistente.DoesNotExist:
+            return Response({'error': 'No se encontró entrada con ese QR en tu evento.'}, status=status.HTTP_404_NOT_FOUND)
+
+        bloqueo = self.verificar_evento_activo(asistente.evento)
+        if bloqueo:
+            return bloqueo
+
+        return Response(_asistente_response(asistente))
+
+
+class CajeraBuscarDniView(EventoActivoMixin, APIView):
+    """GET /api/puerta/cajera/buscar-dni/<dni>/"""
+    permission_classes = [IsCajera]
+
+    def get(self, request, dni):
+        from apps.cuentas.models import AsignacionStaff
+        asignacion = AsignacionStaff.objects.filter(usuario=request.user, activa=True).first()
+        if not asignacion:
+            return Response({'error': 'No tenés un evento asignado activo.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            asistente = Asistente.objects.select_related('evento', 'link_rrpp').get(
+                dni=dni, evento=asignacion.evento,
+            )
+        except Asistente.DoesNotExist:
+            return Response({'error': 'No se encontró una persona pendiente de cobro con ese DNI.'}, status=status.HTTP_404_NOT_FOUND)
+
+        bloqueo = self.verificar_evento_activo(asistente.evento)
+        if bloqueo:
+            return bloqueo
+
+        return Response(_asistente_response(asistente))

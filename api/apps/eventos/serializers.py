@@ -1,37 +1,28 @@
-from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Evento
 from .utils import calcular_precio_publicado
 
-# Meses abreviados en español para `fechaCorta` (ej: "24 jul").
-_MESES_ABREV = [
-    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-    'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
-]
-
 
 class EventoListSerializer(serializers.ModelSerializer):
     precio_publicado = serializers.SerializerMethodField()
     organizador_nombre = serializers.SerializerMethodField()
-    # Campos derivados que consume el frontend público (EventCard, detalle, etc.)
-    slug = serializers.SerializerMethodField()
+    fecha_corta = serializers.SerializerMethodField()
     club = serializers.SerializerMethodField()
     ciudad = serializers.SerializerMethodField()
-    genero = serializers.SerializerMethodField()
-    imagen = serializers.SerializerMethodField()
-    fechaCorta = serializers.SerializerMethodField()
     horario = serializers.SerializerMethodField()
-    lineup = serializers.SerializerMethodField()
+    imagen = serializers.SerializerMethodField()
+    genero = serializers.SerializerMethodField()
+    descripcion = serializers.SerializerMethodField()
 
     class Meta:
         model = Evento
         fields = [
-            'id', 'nombre', 'fecha', 'color_pulsera',
+            'id', 'nombre', 'fecha', 'fecha_corta', 'color_pulsera',
             'precio_base', 'precio_publicado', 'aforo_max',
             'estado', 'habilitar_lista', 'organizador_nombre',
-            'slug', 'club', 'ciudad', 'genero', 'imagen',
-            'fechaCorta', 'horario', 'lineup',
+            'club', 'ciudad', 'horario', 'line_up', 'imagen',
+            'genero', 'descripcion',
         ]
         read_only_fields = ['id', 'estado', 'organizador_nombre']
 
@@ -44,38 +35,28 @@ class EventoListSerializer(serializers.ModelSerializer):
             return nombre if nombre else obj.organizador.username
         return None
 
-    def get_slug(self, obj):
-        return str(obj.id)
+    def get_fecha_corta(self, obj):
+        return obj.fecha.strftime('%a %d %b').upper() if obj.fecha else None
 
     def get_club(self, obj):
-        return obj.boliche.nombre if obj.boliche_id else None
+        return obj.boliche.nombre if obj.boliche else None
 
     def get_ciudad(self, obj):
-        # `direccion` es texto libre; best-effort: último segmento tras una coma.
-        if not obj.boliche_id or not obj.boliche.direccion:
-            return None
-        partes = [p.strip() for p in obj.boliche.direccion.split(',') if p.strip()]
-        return partes[-1] if len(partes) > 1 else obj.boliche.direccion.strip()
-
-    def get_genero(self, obj):
-        return 'Techno'
-
-    def get_imagen(self, obj):
+        if obj.boliche and hasattr(obj.boliche, 'ciudad'):
+            return obj.boliche.ciudad
         return None
 
-    def get_fechaCorta(self, obj):
-        if not obj.fecha:
-            return None
-        local = timezone.localtime(obj.fecha)
-        return f"{local.day:02d} {_MESES_ABREV[local.month - 1]}"
-
     def get_horario(self, obj):
-        if not obj.fecha:
-            return None
-        return timezone.localtime(obj.fecha).strftime('%H:%M')
+        return obj.fecha.strftime('%H:%M') if obj.fecha else None
 
-    def get_lineup(self, obj):
-        return obj.line_up
+    def get_imagen(self, obj):
+        return getattr(obj, 'imagen', None)
+
+    def get_genero(self, obj):
+        return getattr(obj, 'genero', None)
+
+    def get_descripcion(self, obj):
+        return getattr(obj, 'descripcion', None)
 
 
 class EventoDetailSerializer(EventoListSerializer):
@@ -83,7 +64,7 @@ class EventoDetailSerializer(EventoListSerializer):
 
     class Meta(EventoListSerializer.Meta):
         fields = EventoListSerializer.Meta.fields + [
-            'line_up', 'desglose_precio',
+            'desglose_precio',
             'motivo_cancelacion', 'created_at', 'updated_at',
         ]
         read_only_fields = EventoListSerializer.Meta.read_only_fields + [

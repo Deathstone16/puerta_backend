@@ -4,7 +4,6 @@ Vistas de la app pagos: preferencia MP, webhook, wallet y dashboards.
 import hashlib
 import hmac
 import logging
-import re
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -106,14 +105,7 @@ class WebhookView(APIView):
         # Siempre responder 200 para que MP no reintente
         try:
             data = request.data
-            # REQ-5.2: el topic puede venir en el body ('type'/'topic') o en la query.
-            topic = (
-                data.get('type')
-                or data.get('topic')
-                or request.query_params.get('topic')
-                or request.query_params.get('type')
-                or ''
-            )
+            topic = data.get('type') or request.query_params.get('topic', '')
 
             if topic != 'payment':
                 return Response({'ok': True})
@@ -134,40 +126,26 @@ class WebhookView(APIView):
             if pago.get('status') != 'approved':
                 return Response({'ok': True})
 
-            # Extraer datos del comprador
+            # Extract buyer data
             metadata = pago.get('metadata', {})
             evento_id = metadata.get('evento_id')
-            payer = pago.get('payer', {})
-            # REQ-5.1: el DNI sale de la metadata. NUNCA usar el email como DNI.
-            dni = str(metadata.get('dni') or '').strip()
-            nombre = str(metadata.get('nombre') or payer.get('first_name') or '').strip()
-            apellido = str(metadata.get('apellido') or payer.get('last_name') or '').strip()
+            dni = metadata.get('dni')
+            nombre = metadata.get('nombre')
+            apellido = metadata.get('apellido')
 
             if not evento_id:
                 logger.warning("Webhook sin evento_id en metadata, payment_id=%s", payment_id)
                 return Response({'ok': True})
 
-            # REQ-5.1: validar DNI (7-8 dígitos) y nombre/apellido ANTES de crear.
-            # Si los datos no sirven, no creamos un asistente basura (respondemos 200
-            # igual para que MP no reintente, pero logueamos para diagnóstico).
-            if not re.fullmatch(r'\d{7,8}', dni):
-                logger.warning(
-                    "Webhook con DNI inválido (%r), payment_id=%s — no se crea asistente.",
-                    dni, payment_id,
-                )
-                return Response({'ok': True})
-            if not nombre or not apellido:
-                logger.warning(
-                    "Webhook sin nombre/apellido, payment_id=%s — no se crea asistente.",
-                    payment_id,
-                )
+            if not all([dni, nombre, apellido]):
+                logger.error("Webhook metadata incompleta, payment_id=%s metadata=%s", payment_id, metadata)
                 return Response({'ok': True})
 
             evento = Evento.objects.get(pk=evento_id)
 
-            # Calcular fee real
+            # El marketplace_fee de Norware es típicamente el último fee en la lista
             fee_details = pago.get('fee_details', [])
-            fee_real = fee_details[0].get('amount', 0) if fee_details else 0
+            fee_real = fee_details[-1].get('amount', 0) if fee_details else 0
 
             # Crear asistente
             asistente = Asistente.objects.create(
@@ -273,7 +251,10 @@ class WalletView(APIView):
                 'id': evento.id,
                 'nombre': evento.nombre,
                 'fecha': evento.fecha,
-                'boliche': evento.boliche.nombre,
+                'fecha_corta': evento.fecha.strftime('%a %d %b').upper() if evento.fecha else None,
+                'horario': evento.fecha.strftime('%H:%M') if evento.fecha else None,
+                'boliche': evento.boliche.nombre if evento.boliche else None,
+                'club': evento.boliche.nombre if evento.boliche else None,
                 'color_pulsera': evento.color_pulsera,
             },
             'qr_code': str(asistente.wallet_token),
@@ -327,10 +308,16 @@ class RecaudacionCajeraView(APIView):
 def _build_recaudacion(evento):
     """Shared helper: builds recaudación response for a given evento."""
     qs = Asistente.objects.filter(evento=evento, estado='ingresado_final')
+    qs_web_pendiente = Asistente.objects.filter(
+        evento=evento, tipo_ingreso='web_anticipada', estado__in=['pendiente', 'aprobado_guardia']
+    )
 
     web = qs.filter(tipo_ingreso='web_anticipada').aggregate(
         monto=Sum('monto_pagado'), cantidad=Count('id'),
         comision_norware=Sum('mp_fee_norware'),
+    )
+    web_pendiente = qs_web_pendiente.aggregate(
+        monto=Sum('monto_pagado'), cantidad=Count('id'),
     )
     efectivo = qs.filter(metodo_pago='efectivo').aggregate(
         monto=Sum('monto_pagado'), cantidad=Count('id'),
@@ -348,6 +335,8 @@ def _build_recaudacion(evento):
             'cantidad': web['cantidad'] or 0,
             'monto_bruto': float(web['monto'] or 0),
             'comision_norware': float(web['comision_norware'] or 0),
+            'pendiente_ingreso': web_pendiente['cantidad'] or 0,
+            'pendiente_monto': float(web_pendiente['monto'] or 0),
         },
         'efectivo': {
             'cantidad': efectivo['cantidad'] or 0,

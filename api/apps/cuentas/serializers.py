@@ -35,6 +35,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def _get_staff_evento(self):
         """Resolve the active event assignment for guardia/cajera."""
         from apps.cuentas.models import AsignacionStaff
+        from apps.eventos.utils import calcular_precio_publicado
 
         asignacion = AsignacionStaff.objects.filter(
             usuario=self.user, activa=True,
@@ -48,7 +49,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'id': evento.id,
             'nombre': evento.nombre,
             'fecha': str(evento.fecha) if evento.fecha else None,
-            'precio_publicado': float(evento.precio_base) if hasattr(evento, 'precio_base') else 0,
+            'precio_publicado': calcular_precio_publicado(evento.precio_base)['precio_publicado'],
         }
 
 

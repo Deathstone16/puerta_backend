@@ -26,30 +26,16 @@ class AsignacionConEstadisticasSerializer(serializers.ModelSerializer):
     evento_nombre = serializers.CharField(source='evento.nombre', read_only=True)
     evento_fecha = serializers.DateTimeField(source='evento.fecha', read_only=True)
     color_pulsera = serializers.CharField(source='evento.color_pulsera', read_only=True)
+    cupo_max = serializers.IntegerField(source='evento.aforo_max', read_only=True)
     estadisticas = serializers.SerializerMethodField()
-    # REQ-3.2: el frontend del RRPP consume el link de lista directo.
-    slug = serializers.SerializerMethodField()
-    link_personal = serializers.SerializerMethodField()
 
     class Meta:
         model = AsignacionRRPP
         fields = [
             'id', 'evento_id', 'evento_nombre', 'evento_fecha',
             'color_pulsera', 'activa', 'tipo_comision', 'valor_comision',
-            'links', 'slug', 'link_personal', 'estadisticas',
+            'links', 'estadisticas', 'cupo_max',
         ]
-
-    def _link_lista(self, asignacion):
-        # Usa el prefetch de `links` (no dispara query nueva).
-        return next((l for l in asignacion.links.all() if l.tipo == 'lista'), None)
-
-    def get_slug(self, asignacion):
-        link = self._link_lista(asignacion)
-        return str(link.slug) if link else None
-
-    def get_link_personal(self, asignacion):
-        link = self._link_lista(asignacion)
-        return f"/lista/{link.slug}/" if link else None
 
     def get_estadisticas(self, asignacion):
         try:
@@ -63,7 +49,7 @@ class AsignacionConEstadisticasSerializer(serializers.ModelSerializer):
             return {
                 'anotados': qs.count(),
                 'ingresados': qs.filter(estado='ingresado_final').count(),
-                'pendientes': qs.filter(estado__in=['pendiente', 'aprobado_guardia']).count(),
+                'pendientes': qs.filter(estado__in=['pendiente', 'aprobado_guardia'], aprobado_rrpp=False).count(),
                 'rebotados': qs.filter(estado='rebotado_guardia').count(),
                 'invitados_recientes': invitados_recientes,
             }
@@ -108,7 +94,6 @@ class RRPPCreateSerializer(serializers.Serializer):
                 last_name=validated_data['apellido'],
                 telefono=validated_data.get('telefono', ''),
                 rol='rrpp',
-                organizador=organizador,  # REQ-8.1: el usuario también queda ligado al dueño
             )
             rrpp = RRPP.objects.create(
                 usuario=user,
