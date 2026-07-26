@@ -42,29 +42,30 @@ class EventoListSerializer(serializers.ModelSerializer):
         return obj.boliche.nombre if obj.boliche else None
 
     def get_ciudad(self, obj):
-        if obj.boliche and hasattr(obj.boliche, 'ciudad'):
-            return obj.boliche.ciudad
+        if obj.boliche:
+            return obj.boliche.ciudad or None
         return None
 
     def get_horario(self, obj):
         return obj.fecha.strftime('%H:%M') if obj.fecha else None
 
     def get_imagen(self, obj):
-        return getattr(obj, 'imagen', None)
+        return obj.imagen or None
 
     def get_genero(self, obj):
-        return getattr(obj, 'genero', None)
+        return obj.genero or None
 
     def get_descripcion(self, obj):
-        return getattr(obj, 'descripcion', None)
+        return obj.descripcion or None
 
 
 class EventoDetailSerializer(EventoListSerializer):
     desglose_precio = serializers.SerializerMethodField()
+    lista_slug = serializers.SerializerMethodField()
 
     class Meta(EventoListSerializer.Meta):
         fields = EventoListSerializer.Meta.fields + [
-            'desglose_precio',
+            'desglose_precio', 'lista_slug',
             'motivo_cancelacion', 'created_at', 'updated_at',
         ]
         read_only_fields = EventoListSerializer.Meta.read_only_fields + [
@@ -73,3 +74,14 @@ class EventoDetailSerializer(EventoListSerializer):
 
     def get_desglose_precio(self, obj):
         return calcular_precio_publicado(obj.precio_base)
+
+    def get_lista_slug(self, obj):
+        """Retorna el slug del primer link de lista activo para este evento, o None."""
+        try:
+            from apps.rrpp.models import LinkRRPP
+            link = LinkRRPP.objects.filter(
+                asignacion__evento=obj, tipo='lista', activo=True,
+            ).first()
+            return str(link.slug) if link else None
+        except Exception:
+            return None

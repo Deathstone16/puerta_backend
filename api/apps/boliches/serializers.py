@@ -8,5 +8,5 @@ class BolicheSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Boliche
-        fields = ['id', 'nombre', 'direccion', 'mp_connected', 'created_at']
+        fields = ['id', 'nombre', 'direccion', 'ciudad', 'mp_connected', 'created_at']
         read_only_fields = ['id', 'created_at', 'mp_connected']

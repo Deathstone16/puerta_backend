@@ -194,7 +194,7 @@ class WebhookView(APIView):
         manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
 
         # Calcular HMAC-SHA256
-        expected = hmac.new(
+        expected = hmac.HMAC(
             settings.MP_WEBHOOK_SECRET.encode(),
             manifest.encode(),
             hashlib.sha256,
@@ -242,6 +242,7 @@ class WalletView(APIView):
 
         return Response({
             'token': str(asistente.wallet_token),
+            'codigo': f"N{asistente.id:04d}-{str(asistente.wallet_token)[:8].upper()}",
             'nombre': asistente.nombre,
             'apellido': asistente.apellido,
             'dni': asistente.dni,
@@ -381,16 +382,17 @@ class RankingRRPPView(APIView):
             )
 
             rrpp_obj = asig.rrpp
+            valor_comision = float(asig.valor_comision or 0)
             if asig.tipo_comision == 'fijo':
-                comision = float(asig.valor_comision) * ingresados
+                comision = valor_comision * ingresados
             else:
-                comision = recaudado * float(asig.valor_comision) / 100
+                comision = recaudado * valor_comision / 100
 
             ranking.append({
                 'rrpp_id': rrpp_obj.id,
                 'nombre': rrpp_obj.usuario.get_full_name() or rrpp_obj.usuario.username,
                 'tipo_comision': asig.tipo_comision,
-                'valor_comision': float(asig.valor_comision),
+                'valor_comision': valor_comision,
                 'anotados': anotados,
                 'ingresados': ingresados,
                 'rebotados': rebotados,
@@ -430,7 +432,7 @@ class MetricasAdminView(APIView):
             por_evento.append({
                 'evento_id': evento.id,
                 'evento_nombre': evento.nombre,
-                'boliche': evento.boliche.nombre,
+                'boliche': evento.boliche.nombre if evento.boliche else 'Sin boliche',
                 'fecha': evento.fecha,
                 'estado': evento.estado,
                 'entradas_web': entradas_web,

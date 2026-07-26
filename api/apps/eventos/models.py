@@ -25,6 +25,9 @@ class Evento(models.Model):
     color_pulsera = models.CharField(max_length=50, blank=True, default='amarilla')
     precio_base = models.DecimalField(max_digits=10, decimal_places=2)
     line_up = models.JSONField(default=list, blank=True)
+    imagen = models.URLField(blank=True, null=True, help_text='URL de imagen del evento')
+    genero = models.CharField(max_length=100, blank=True, default='', help_text='Género musical principal')
+    descripcion = models.TextField(blank=True, default='', help_text='Descripción del evento')
     habilitar_lista = models.BooleanField(
         default=True,
         help_text='Indica si el evento permite listas RRPP o solo venta anticipada web',

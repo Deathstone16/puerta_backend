@@ -5,6 +5,7 @@ from django.db import models
 class Boliche(models.Model):
     nombre = models.CharField(max_length=200)
     direccion = models.TextField()
+    ciudad = models.CharField(max_length=100, blank=True, default='', help_text='Ciudad donde se ubica el boliche')
     dueno = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
