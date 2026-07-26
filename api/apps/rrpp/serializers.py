@@ -40,21 +40,36 @@ class AsignacionConEstadisticasSerializer(serializers.ModelSerializer):
     def get_estadisticas(self, asignacion):
         try:
             from apps.puerta.models import Asistente
+            from django.db.models import Sum
+
             qs = Asistente.objects.filter(link_rrpp__asignacion=asignacion)
+            ingresados = qs.filter(estado='ingresado_final').count()
+            recaudado = float(
+                qs.filter(estado='ingresado_final').aggregate(t=Sum('monto_pagado'))['t'] or 0
+            )
             invitados_recientes = list(
                 qs.order_by('-created_at')[:20].values(
-                    'id', 'nombre', 'apellido', 'dni', 'instagram', 'estado', 'created_at',
+                    'id', 'nombre', 'apellido', 'dni', 'instagram', 'estado', 'created_at', 'aprobado_rrpp',
                 )
             )
+
+            # Calcular comisión acumulada
+            valor_comision = float(asignacion.valor_comision or 0)
+            if asignacion.tipo_comision == 'fijo':
+                comision_acumulada = valor_comision * ingresados
+            else:
+                comision_acumulada = recaudado * valor_comision / 100
+
             return {
                 'anotados': qs.count(),
-                'ingresados': qs.filter(estado='ingresado_final').count(),
+                'ingresados': ingresados,
                 'pendientes': qs.filter(estado__in=['pendiente', 'aprobado_guardia'], aprobado_rrpp=False).count(),
                 'rebotados': qs.filter(estado='rebotado_guardia').count(),
+                'comision_acumulada': round(comision_acumulada, 2),
                 'invitados_recientes': invitados_recientes,
             }
         except Exception:
-            return {'anotados': 0, 'ingresados': 0, 'pendientes': 0, 'rebotados': 0, 'invitados_recientes': []}
+            return {'anotados': 0, 'ingresados': 0, 'pendientes': 0, 'rebotados': 0, 'comision_acumulada': 0, 'invitados_recientes': []}
 
 
 class RRPPSerializer(serializers.ModelSerializer):
