@@ -30,7 +30,7 @@ def _get_seller_sdk(boliche):
     return mercadopago.SDK(boliche.mp_access_token)
 
 
-def crear_preferencia(evento, comprador: dict) -> dict:
+def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> dict:
     """
     Crea una preferencia de pago usando el access_token del vendedor (split payment).
 
@@ -40,6 +40,7 @@ def crear_preferencia(evento, comprador: dict) -> dict:
     Args:
         evento: instancia de Evento (con boliche.mp_access_token)
         comprador: {'nombre': str, 'apellido': str, 'email': str, 'dni': str}
+        link_slug: slug del LinkRRPP que originó la compra (para atribuir la venta al RRPP)
 
     Returns:
         {'init_point': str, 'preference_id': str}
@@ -82,6 +83,7 @@ def crear_preferencia(evento, comprador: dict) -> dict:
             'dni': comprador['dni'],
             'nombre': comprador['nombre'],
             'apellido': comprador['apellido'],
+            'link_slug': link_slug or '',
         },
     }
 

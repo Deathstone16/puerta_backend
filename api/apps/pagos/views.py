@@ -25,6 +25,27 @@ from .mp_client import MPError
 logger = logging.getLogger(__name__)
 
 
+def _resolver_link_slug(link_slug, evento):
+    """Devuelve el slug si corresponde a un LinkRRPP activo del evento, si no None.
+
+    El slug es un UUID: si llega mal formado se ignora en vez de romper el checkout.
+    """
+    if not link_slug:
+        return None
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from apps.rrpp.models import LinkRRPP
+    try:
+        existe = LinkRRPP.objects.filter(
+            slug=link_slug, activo=True, asignacion__evento=evento, asignacion__activa=True,
+        ).exists()
+    except (DjangoValidationError, ValueError, TypeError):
+        existe = False
+    if not existe:
+        logger.info("link_slug %r no válido para evento %s, se ignora", link_slug, evento.id)
+        return None
+    return str(link_slug)
+
+
 # ─── Preferencia de pago ─────────────────────────────────────────────────────
 
 class PreferenciaView(APIView):
@@ -39,6 +60,7 @@ class PreferenciaView(APIView):
         apellido = request.data.get('apellido', '').strip()
         dni = request.data.get('dni', '').strip()
         email = request.data.get('email', '').strip()
+        link_slug = (request.data.get('link_slug') or '').strip()
 
         if not all([evento_id, nombre, apellido, dni, email]):
             return Response(
@@ -66,10 +88,14 @@ class PreferenciaView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        # Atribución RRPP: el slug tiene que ser un link de venta/lista activo DEL MISMO evento.
+        # Si no valida, la compra sigue como venta web directa (sin atribución) en vez de fallar.
+        link_slug_valido = _resolver_link_slug(link_slug, evento)
+
         comprador = {'nombre': nombre, 'apellido': apellido, 'email': email, 'dni': dni}
 
         try:
-            result = mp_client.crear_preferencia(evento, comprador)
+            result = mp_client.crear_preferencia(evento, comprador, link_slug=link_slug_valido)
         except MPError as e:
             logger.error("Error MP al crear preferencia: %s", e)
             return Response(
@@ -147,9 +173,22 @@ class WebhookView(APIView):
             fee_details = pago.get('fee_details', [])
             fee_real = fee_details[-1].get('amount', 0) if fee_details else 0
 
+            # Atribución RRPP: si la compra vino de un link, la venta se le acredita.
+            link_rrpp = None
+            link_slug = metadata.get('link_slug')
+            if link_slug:
+                from apps.rrpp.models import LinkRRPP
+                try:
+                    link_rrpp = LinkRRPP.objects.filter(
+                        slug=link_slug, asignacion__evento=evento,
+                    ).first()
+                except Exception:
+                    link_rrpp = None
+
             # Crear asistente
             asistente = Asistente.objects.create(
                 evento=evento,
+                link_rrpp=link_rrpp,
                 nombre=nombre,
                 apellido=apellido,
                 dni=dni,
