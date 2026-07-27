@@ -428,17 +428,17 @@ class CajeraEscanearBuscarTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['dni'], '30111222')
         self.assertEqual(resp.data['tipo_ingreso'], 'lista_rrpp')
-        # monto_pago = precio_base del evento (5000)
-        self.assertEqual(float(resp.data['monto_pago']), 5000.0)
+        # monto_pago = precio_publicado del evento (5700 = base + fees) para lista_rrpp
+        self.assertEqual(float(resp.data['monto_pago']), 5700.0)
 
     def test_buscar_dni_inexistente_da_404(self):
         resp = self.client_c.get('/api/puerta/cajera/buscar-dni/00000000/')
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_buscar_dni_sin_asignacion_da_400(self):
+    def test_buscar_dni_sin_asignacion_da_404(self):
         otra = _crear_usuario('cajera_sin', 'cajera')
         resp = _auth_client(otra).get('/api/puerta/cajera/buscar-dni/30111222/')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_escanear_qr_lista_devuelve_datos_para_cobrar(self):
         a = self._crear_asistente_lista(dni='30111333')
@@ -450,7 +450,8 @@ class CajeraEscanearBuscarTests(TestCase):
         self.assertEqual(resp.data['id'], a.id)
         self.assertEqual(resp.data['tipo_ingreso'], 'lista_rrpp')
 
-    def test_escanear_qr_web_marca_ingreso(self):
+    def test_escanear_qr_web_identifica_sin_cambiar_estado(self):
+        # El escaneo de QR es identify-only: devuelve los datos, no marca ingreso.
         a = Asistente.objects.create(
             evento=self.evento, nombre='Web', apellido='User', dni='30111444',
             tipo_ingreso='web_anticipada', estado='aprobado_guardia',
@@ -460,8 +461,9 @@ class CajeraEscanearBuscarTests(TestCase):
             {'qr_code': str(a.wallet_token)}, format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['id'], a.id)
         a.refresh_from_db()
-        self.assertEqual(a.estado, 'ingresado_final')
+        self.assertEqual(a.estado, 'aprobado_guardia')
 
     def test_escanear_qr_desconocido_da_404(self):
         import uuid
