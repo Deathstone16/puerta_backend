@@ -91,7 +91,11 @@ class EventoCreateView(CreateAPIView):
     serializer_class = EventoDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(organizador=self.request.user)
+        # El evento necesita un boliche para poder cobrar por Mercado Pago (la cuenta
+        # de MP vive en el boliche). Si el dueño tiene boliche(s), se asigna el primero;
+        # con varios boliches habría que dejar elegir cuál (pendiente de definir).
+        boliche = self.request.user.boliches.first()
+        serializer.save(organizador=self.request.user, boliche=boliche)
 
 
 # ─── Cancelar evento ─────────────────────────────────────────────────────────

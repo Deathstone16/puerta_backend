@@ -393,3 +393,28 @@ class MetricasAdminTests(TestCase):
         client = _auth_client(dueno)
         resp = client.get('/api/admin/metricas/')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PreferenciaSinBolicheTests(TestCase):
+    """El pago no debe tirar 500 cuando el evento no tiene boliche."""
+
+    def setUp(self):
+        from apps.cuentas.models import Usuario
+        from apps.eventos.models import Evento
+        from decimal import Decimal as D
+        dueno = Usuario.objects.create_user('dueno_sb', 'x', rol='dueno')
+        self.evento = Evento.objects.create(
+            organizador=dueno, boliche=None, nombre='SinBoliche',
+            fecha=timezone.now() + timezone.timedelta(days=2),
+            aforo_max=100, precio_base=D('5000'),
+        )
+        self.client = APIClient()
+
+    def test_preferencia_sin_boliche_no_es_500(self):
+        resp = self.client.post('/api/pagos/preferencia/', {
+            'evento_id': self.evento.pk, 'nombre': 'A', 'apellido': 'B',
+            'dni': '40111222', 'email': 'a@b.com',
+        }, format='json')
+        # No debe ser 500; debe ser un error controlado (503).
+        self.assertNotEqual(resp.status_code, 500)
+        self.assertEqual(resp.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)

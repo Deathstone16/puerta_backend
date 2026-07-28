@@ -52,6 +52,11 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
 
     boliche = evento.boliche
 
+    # El evento puede no tener boliche asociado (campo opcional). Sin boliche no hay
+    # cuenta de MP del vendedor: se maneja como MPError, no como crash (evitaba un 500).
+    if boliche is None:
+        raise MPError("El evento no tiene un boliche con Mercado Pago conectado.")
+
     if not boliche.mp_connected:
         raise MPError("El organizador no conectó su cuenta de Mercado Pago.")
 
