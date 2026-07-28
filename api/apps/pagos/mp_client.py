@@ -50,10 +50,14 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
     """
     from apps.eventos.utils import calcular_precio_publicado
 
+    # El evento puede haberse creado antes de que el dueño conectara MP (y entonces
+    # quedó sin boliche). Como fallback usamos el boliche del organizador, así los
+    # eventos viejos también pueden cobrar una vez que el dueño conecta Mercado Pago.
     boliche = evento.boliche
+    if boliche is None and evento.organizador_id:
+        boliche = evento.organizador.boliches.first()
 
-    # El evento puede no tener boliche asociado (campo opcional). Sin boliche no hay
-    # cuenta de MP del vendedor: se maneja como MPError, no como crash (evitaba un 500).
+    # Sin boliche no hay cuenta de MP del vendedor: MPError, no un crash (evita el 500).
     if boliche is None:
         raise MPError("El evento no tiene un boliche con Mercado Pago conectado.")
 
