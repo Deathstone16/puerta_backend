@@ -98,8 +98,10 @@ class PreferenciaView(APIView):
             result = mp_client.crear_preferencia(evento, comprador, link_slug=link_slug_valido)
         except MPError as e:
             logger.error("Error MP al crear preferencia: %s", e)
+            # El mensaje de MPError es informativo y seguro de mostrar (ej. "el
+            # organizador no conectó Mercado Pago" / "el evento no tiene boliche").
             return Response(
-                {'error': 'Error al conectar con Mercado Pago.'},
+                {'error': str(e) or 'Error al conectar con Mercado Pago.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
