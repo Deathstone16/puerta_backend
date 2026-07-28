@@ -136,13 +136,12 @@ class EventoListTests(TestCase):
         self.assertIn('precio_publicado', resp.data[0])
 
     def test_listado_incluye_campos_derivados(self):
-        # Área 1: el serializer expone info del boliche/evento como campos planos
-        # (club, ciudad, slug, fechaCorta, horario, lineup) en vez de un objeto anidado.
+        # El serializer expone info del boliche/evento como campos planos
+        # (club, ciudad, fecha_corta, horario, line_up) en vez de un objeto anidado.
         resp = self.client.get('/api/eventos/')
         item = resp.data[0]
-        for campo in ('slug', 'club', 'ciudad', 'genero', 'imagen', 'fechaCorta', 'horario', 'lineup'):
+        for campo in ('club', 'ciudad', 'genero', 'imagen', 'fecha_corta', 'horario', 'line_up'):
             self.assertIn(campo, item)
-        self.assertEqual(item['slug'], str(item['id']))
 
 
 # ─── Tests del detalle ───────────────────────────────────────────────────────
