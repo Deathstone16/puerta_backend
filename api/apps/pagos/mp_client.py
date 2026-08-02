@@ -79,7 +79,7 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
             'surname': comprador['apellido'],
             'email': comprador['email'],
         },
-        'marketplace_fee': fee_norware,
+        #'marketplace_fee': fee_norware,
         'back_urls': {
             'success': f"{settings.FRONTEND_URL}/wallet/pendiente",
             'failure': f"{settings.FRONTEND_URL}/checkout/error",
