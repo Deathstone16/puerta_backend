@@ -120,6 +120,10 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
             'name': comprador['nombre'],
             'surname': comprador['apellido'],
             'email': comprador['email'],
+            'identification': {
+                'type': 'DNI',
+                'number': comprador['dni'],
+            },
         },
         #'marketplace_fee': fee_norware,
         'back_urls': {
