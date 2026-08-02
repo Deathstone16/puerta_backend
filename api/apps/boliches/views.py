@@ -201,41 +201,10 @@ def _exchange_code_for_token(code: str) -> dict:
 def refresh_mp_token(boliche: Boliche) -> bool:
     """
     Renueva el access_token usando el refresh_token.
-    Llamar periódicamente o cuando expire.
-
-    Returns:
-        True si se renovó exitosamente.
+    Delega en apps.pagos.mp_client para que la renovación sea única.
     """
-    if not boliche.mp_refresh_token:
-        return False
-
-    payload = {
-        'client_id': settings.MP_APP_ID,
-        'client_secret': settings.MP_CLIENT_SECRET,
-        'refresh_token': boliche.mp_refresh_token,
-        'grant_type': 'refresh_token',
-    }
-    if settings.MP_TEST_MODE:
-        payload['test_token'] = True
-
-    response = requests.post(
-        'https://api.mercadopago.com/oauth/token',
-        json=payload,
-        headers={'Content-Type': 'application/json'},
-        timeout=15,
-    )
-
-    if response.status_code != 200:
-        logger.error("Error renovando token MP para boliche %s: %s", boliche.id, response.text)
-        return False
-
-    data = response.json()
-    boliche.mp_access_token = data['access_token']
-    boliche.mp_refresh_token = data['refresh_token']
-    boliche.mp_connected_at = timezone.now()
-    boliche.save(update_fields=['mp_access_token', 'mp_refresh_token', 'mp_connected_at'])
-    logger.info("Token MP renovado para boliche %s (token=%s)", boliche.id, boliche.mp_access_token[:8])
-    return True
+    from apps.pagos.mp_client import refrescar_token
+    return refrescar_token(boliche)
 
 
 class MPDisconnectView(APIView):

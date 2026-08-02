@@ -5,7 +5,9 @@ Toda la interacción con la API de MP pasa por este módulo.
 import logging
 
 import mercadopago
+import requests
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,46 @@ def _get_seller_sdk(boliche):
     if not boliche.mp_access_token:
         raise MPError("El boliche no tiene Mercado Pago conectado.")
     return mercadopago.SDK(boliche.mp_access_token)
+
+
+def refrescar_token(boliche) -> bool:
+    """
+    Renueva el access_token del vendedor usando su refresh_token (OAuth).
+    El access_token de MP vence (~180 días): hay que renovarlo antes de que
+    expire o las llamadas a la API devuelven 401 "invalid access token".
+
+    Returns:
+        True si se renovó con éxito y se guardó en el boliche.
+    """
+    if not boliche.mp_refresh_token:
+        return False
+
+    payload = {
+        'client_id': settings.MP_APP_ID,
+        'client_secret': settings.MP_CLIENT_SECRET,
+        'refresh_token': boliche.mp_refresh_token,
+        'grant_type': 'refresh_token',
+    }
+    if settings.MP_TEST_MODE:
+        payload['test_token'] = True
+
+    response = requests.post(
+        'https://api.mercadopago.com/oauth/token',
+        json=payload,
+        headers={'Content-Type': 'application/json'},
+        timeout=15,
+    )
+
+    if response.status_code != 200:
+        logger.error("Error renovando token MP para boliche %s: %s", boliche.id, response.text)
+        return False
+
+    data = response.json()
+    boliche.mp_access_token = data['access_token']
+    boliche.mp_refresh_token = data['refresh_token']
+    boliche.mp_connected_at = timezone.now()
+    boliche.save(update_fields=['mp_access_token', 'mp_refresh_token', 'mp_connected_at'])
+    return True
 
 
 def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> dict:
@@ -100,7 +142,18 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
     sdk = _get_seller_sdk(boliche)
     response = sdk.preference().create(preference_data)
 
+    # Access token vencido/inválido (401): renovar con el refresh_token y reintentar una vez
+    if response['status'] == 401 and refrescar_token(boliche):
+        logger.info("Token MP del boliche %s renovado, reintentando preferencia...", boliche.id)
+        sdk = _get_seller_sdk(boliche)
+        response = sdk.preference().create(preference_data)
+
     if response['status'] not in (200, 201):
+        if response['status'] == 401:
+            raise MPError(
+                "El Mercado Pago del organizador está vencido o no es válido. "
+                "Reconectá su cuenta desde el dashboard."
+            )
         raise MPError(f"Error MP {response['status']}: {response.get('response', {})}")
 
     return {
