@@ -9,7 +9,10 @@ SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver').split(',')
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,testserver,puerta-backend.onrender.com,puerta.neadev.com',
+).split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -188,7 +191,7 @@ SIMPLE_JWT = {
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:5173',
+    default='http://localhost:5173,https://puerta.neadev.com',
 ).split(',')
 CORS_ALLOW_METHODS = ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
 CORS_ALLOW_HEADERS = [
