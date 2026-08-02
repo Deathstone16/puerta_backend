@@ -222,6 +222,7 @@ MP_APP_ID = config('MP_APP_ID', default='')
 MP_CLIENT_SECRET = config('MP_CLIENT_SECRET', default='')
 MP_WEBHOOK_SECRET = config('MP_WEBHOOK_SECRET', default='')
 MP_REDIRECT_URI = config('MP_REDIRECT_URI', default='http://localhost:8000/api/boliches/mp/callback/')
+MP_TEST_MODE = config('MP_TEST_MODE', default=False, cast=bool)
 BACKEND_URL = config('BACKEND_URL', default='http://localhost:8000')
 
 # ─── Mail (SMTP) ─────────────────────────────────────────────────────────────

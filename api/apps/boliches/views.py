@@ -149,6 +149,10 @@ class MPCallbackView(APIView):
         boliche.save(update_fields=[
             'mp_access_token', 'mp_refresh_token', 'mp_user_id', 'mp_connected_at',
         ])
+        logger.info(
+            "Boliche %s conectado a MP (user_id=%s, token=%s)",
+            boliche.id, boliche.mp_user_id, boliche.mp_access_token[:8],
+        )
 
         # Redirigir al frontend con éxito
         return redirect(f"{settings.FRONTEND_URL}/dashboard?mp_connected=true")
@@ -165,15 +169,19 @@ def _exchange_code_for_token(code: str) -> dict:
     Returns:
         {'access_token': str, 'refresh_token': str, 'user_id': int, 'expires_in': int}
     """
+    payload = {
+        'client_id': settings.MP_APP_ID,
+        'client_secret': settings.MP_CLIENT_SECRET,
+        'code': code,
+        'grant_type': 'authorization_code',
+        'redirect_uri': settings.MP_REDIRECT_URI,
+    }
+    if settings.MP_TEST_MODE:
+        payload['test_token'] = True
+
     response = requests.post(
         'https://api.mercadopago.com/oauth/token',
-        json={
-            'client_id': settings.MP_APP_ID,
-            'client_secret': settings.MP_CLIENT_SECRET,
-            'code': code,
-            'grant_type': 'authorization_code',
-            'redirect_uri': settings.MP_REDIRECT_URI,
-        },
+        json=payload,
         headers={'Content-Type': 'application/json'},
         timeout=15,
     )
@@ -201,14 +209,18 @@ def refresh_mp_token(boliche: Boliche) -> bool:
     if not boliche.mp_refresh_token:
         return False
 
+    payload = {
+        'client_id': settings.MP_APP_ID,
+        'client_secret': settings.MP_CLIENT_SECRET,
+        'refresh_token': boliche.mp_refresh_token,
+        'grant_type': 'refresh_token',
+    }
+    if settings.MP_TEST_MODE:
+        payload['test_token'] = True
+
     response = requests.post(
         'https://api.mercadopago.com/oauth/token',
-        json={
-            'client_id': settings.MP_APP_ID,
-            'client_secret': settings.MP_CLIENT_SECRET,
-            'refresh_token': boliche.mp_refresh_token,
-            'grant_type': 'refresh_token',
-        },
+        json=payload,
         headers={'Content-Type': 'application/json'},
         timeout=15,
     )
@@ -222,6 +234,7 @@ def refresh_mp_token(boliche: Boliche) -> bool:
     boliche.mp_refresh_token = data['refresh_token']
     boliche.mp_connected_at = timezone.now()
     boliche.save(update_fields=['mp_access_token', 'mp_refresh_token', 'mp_connected_at'])
+    logger.info("Token MP renovado para boliche %s (token=%s)", boliche.id, boliche.mp_access_token[:8])
     return True
 
 

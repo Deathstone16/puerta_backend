@@ -149,9 +149,11 @@ class MPConnectTests(TestCase):
         self.assertIn('auth.mercadopago.com.ar', resp.data['auth_url'])
         self.assertIn('APP-123', resp.data['auth_url'])
 
-    def test_connect_sin_boliche_devuelve_400(self):
+    def test_connect_sin_boliche_devuelve_auth_url(self):
         resp = self.client.get('/api/boliches/mp/connect/')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn('auth_url', resp.data)
+        self.assertIn('auth.mercadopago.com.ar', resp.data['auth_url'])
 
     def test_connect_sin_auth_devuelve_401(self):
         client = APIClient()
