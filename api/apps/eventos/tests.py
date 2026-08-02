@@ -201,11 +201,13 @@ class EventoCreateTests(TestCase):
         self.assertIn('desglose_precio', resp.data)
         self.assertEqual(resp.data['nombre'], 'Nueva Noche')
 
-    def test_crear_evento_boliche_ajeno_devuelve_403(self):
+    def test_crear_evento_con_boliche_ajeno_usa_boliche_propio(self):
         otro_dueno = _crear_usuario('otro_dueno', 'dueno')
         client = _auth_client(otro_dueno)
         resp = client.post('/api/eventos/crear/', self.payload, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        evento = Evento.objects.get(organizador=otro_dueno)
+        self.assertIsNone(evento.boliche)
 
     def test_crear_evento_sin_auth_devuelve_401(self):
         client = APIClient()
