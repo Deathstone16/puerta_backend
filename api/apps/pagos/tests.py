@@ -270,6 +270,56 @@ class WalletTests(TestCase):
 
 # ─── Tests de Reembolsos ─────────────────────────────────────────────────────
 
+# ─── Tests de obtención de pagos (fallback a token de boliche) ──────────────
+
+class MPClientObtenerPagoTests(TestCase):
+    """
+    En modo de pruebas el token de la app puede no poder leer pagos de un
+    vendedor de prueba; obtener_pago debe reintentar con el token del boliche.
+    """
+
+    def setUp(self):
+        self.dueno, self.boliche, _ = _setup()
+
+    @patch('apps.pagos.mp_client._get_seller_sdk')
+    @patch('apps.pagos.mp_client._get_sdk')
+    def test_app_token_falla_y_usa_token_boliche(self, mock_app_sdk, mock_seller_sdk):
+        from apps.pagos.mp_client import obtener_pago
+        mock_app_sdk.return_value.payment.return_value.get.return_value = {
+            'status': 404, 'response': {},
+        }
+        mock_seller_sdk.return_value.payment.return_value.get.return_value = {
+            'status': 200, 'response': {'id': 'PAY-T1', 'status': 'approved'},
+        }
+        pago = obtener_pago('PAY-T1')
+        self.assertEqual(pago['status'], 'approved')
+        mock_seller_sdk.assert_called_once_with(self.boliche)
+
+    @patch('apps.pagos.mp_client._get_seller_sdk')
+    @patch('apps.pagos.mp_client._get_sdk')
+    def test_app_token_ok_no_usa_token_boliche(self, mock_app_sdk, mock_seller_sdk):
+        from apps.pagos.mp_client import obtener_pago
+        mock_app_sdk.return_value.payment.return_value.get.return_value = {
+            'status': 200, 'response': {'id': 'PAY-T2', 'status': 'approved'},
+        }
+        pago = obtener_pago('PAY-T2')
+        self.assertEqual(pago['status'], 'approved')
+        mock_seller_sdk.assert_not_called()
+
+    @patch('apps.pagos.mp_client._get_seller_sdk')
+    @patch('apps.pagos.mp_client._get_sdk')
+    def test_todos_los_tokens_fallan_levanta_mperror(self, mock_app_sdk, mock_seller_sdk):
+        from apps.pagos.mp_client import MPError, obtener_pago
+        mock_app_sdk.return_value.payment.return_value.get.return_value = {
+            'status': 404, 'response': {},
+        }
+        mock_seller_sdk.return_value.payment.return_value.get.return_value = {
+            'status': 404, 'response': {},
+        }
+        with self.assertRaises(MPError):
+            obtener_pago('PAY-T3')
+
+
 class ReembolsoTests(TestCase):
 
     def setUp(self):

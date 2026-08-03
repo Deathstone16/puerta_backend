@@ -166,23 +166,60 @@ def crear_preferencia(evento, comprador: dict, link_slug: str | None = None) -> 
     }
 
 
+def _iterar_sdks():
+    """
+    Genera los SDKs a probar para operar sobre un pago: primero el de la app
+    (Norware) y después el de cada boliche con MP conectado.
+
+    En modo de pruebas el token de la app puede no poder leer/reembolsar pagos
+    de un vendedor de prueba, pero el access_token del propio vendedor siempre
+    puede operar sobre sus pagos. Así el webhook funciona en test y producción.
+    """
+    yield _get_sdk()
+    from apps.boliches.models import Boliche
+
+    boliches = Boliche.objects.filter(
+        mp_access_token__isnull=False,
+        mp_user_id__isnull=False,
+    )
+    for boliche in boliches:
+        yield _get_seller_sdk(boliche)
+
+
 def obtener_pago(payment_id: str) -> dict:
-    """Obtiene los datos de un pago por su ID (usando token de Norware)."""
-    sdk = _get_sdk()
-    response = sdk.payment().get(payment_id)
-    if response['status'] != 200:
-        raise MPError(f"Error al obtener pago {payment_id}: status {response['status']}")
-    return response['response']
+    """
+    Obtiene los datos de un pago por su ID.
+
+    Prueba primero con el token de la app; si falla, con el token de cada
+    boliche conectado (el vendedor siempre puede leer sus propios pagos).
+    """
+    errores = []
+    for sdk in _iterar_sdks():
+        try:
+            response = sdk.payment().get(payment_id)
+            if response['status'] == 200:
+                return response['response']
+            errores.append(f"status {response['status']}")
+        except Exception as e:  # noqa: BLE001
+            errores.append(str(e))
+    raise MPError(f"Error al obtener pago {payment_id}: {'; '.join(errores) or 'sin respuesta'}")
 
 
 def reembolsar_pago(payment_id: str, idempotency_key: str) -> bool:
     """
-    Solicita el reembolso total de un pago (usando token de Norware).
-    Devuelve True si fue exitoso.
+    Solicita el reembolso total de un pago.
+
+    Prueba primero con el token de la app; si falla, con el token de cada
+    boliche conectado. Devuelve True si fue exitoso.
     """
-    sdk = _get_sdk()
-    response = sdk.refund().create(
-        payment_id,
-        request_options={'custom_headers': {'x-idempotency-key': idempotency_key}},
-    )
-    return response['status'] in (200, 201)
+    for sdk in _iterar_sdks():
+        try:
+            response = sdk.refund().create(
+                payment_id,
+                request_options={'custom_headers': {'x-idempotency-key': idempotency_key}},
+            )
+            if response['status'] in (200, 201):
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
